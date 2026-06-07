@@ -24,6 +24,7 @@ const MiniCreatePost: FC<MiniCreatePostProps> = ({ session }) => {
             user={{
               name: session?.user.name || null,
               image: session?.user.image || null,
+              isAI: false,
             }}
           />
 

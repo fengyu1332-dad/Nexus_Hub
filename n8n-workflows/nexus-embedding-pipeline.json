@@ -1,0 +1,151 @@
+{
+  "name": "🧬 Embedding 记忆注入 — 文章向量化存储",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "embedding-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "emb-trigger",
+      "name": "📥 Midas 发布回调",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "nexus-embedding-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 接收 Midas 发布结果，提取 postId\n// 输入: { postId, subredditName, authorRole }\n// ──────────────────────────────────────────────\n\nconst pubResult = $input.first().json;\n\nreturn {\n  postId: pubResult.postId || pubResult.id,\n  subreddit: pubResult.subredditName || pubResult.subreddit,\n  author: pubResult.authorRole || pubResult.author\n};"
+      },
+      "id": "emb-extract",
+      "name": "🔍 提取 postId",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://host.docker.internal:3000/api/post/embedding?postId={{ $json.postId }}",
+        "authentication": "none",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "emb-fetch",
+      "name": "📡 获取文章内容",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 将文章内容按语义切片 (Chunking)\n// 每个切片独立编码，取平均向量\n// ──────────────────────────────────────────────\n\nconst post = $input.first().json;\nconst content = typeof post.embedding === 'string' ? post.embedding : (post.content || post.title || '');\n\n// 简单切片: 按 ## 标题分割，每段 ≤ 2000 字符\nfunction chunkText(text, maxLen = 2000) {\n  if (!text || typeof text !== 'string') return [text || ''];\n  const sections = text.split(/(?=^## )/m);\n  const chunks = [];\n  for (const sec of sections) {\n    if (sec.length <= maxLen) {\n      if (sec.trim()) chunks.push(sec.trim());\n    } else {\n      // 按段落再切\n      const paras = sec.split(/\\n\\n+/);\n      let cur = '';\n      for (const p of paras) {\n        if ((cur + p).length > maxLen && cur) {\n          chunks.push(cur.trim());\n          cur = p;\n        } else {\n          cur += (cur ? '\\n\\n' : '') + p;\n        }\n      }\n      if (cur.trim()) chunks.push(cur.trim());\n    }\n  }\n  return chunks.filter(c => c.length > 50);\n}\n\nconst chunks = chunkText(content);\n\nreturn chunks.map((chunk, i) => ({\n  postId: post.postId,\n  chunkIndex: i,\n  totalChunks: chunks.length,\n  text: chunk,\n  // 为每个 chunk 构建 embedding 请求\n  _embInput: chunk.substring(0, 8000)  // API 限制 8192 tokens\n}));"
+      },
+      "id": "emb-chunk",
+      "name": "✂️ 内容切片",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "emb-loop",
+      "name": "🔄 逐块处理",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EMBEDDING_API_BASE || 'https://api.openai.com/v1/embeddings' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY || $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": $env.EMBEDDING_MODEL || 'text-embedding-3-small',\n  \"input\": $json._embInput\n}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "emb-encode",
+      "name": "🤖 Embedding 编码",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 收集所有 chunk 的 embedding 向量\n// 取平均值作为整篇文章的表示\n// ──────────────────────────────────────────────\n\nconst items = $input.all();\nconst vectors = [];\n\nfor (const item of items) {\n  const resp = item.json;\n  const emb = resp.data?.[0]?.embedding;\n  if (emb && Array.isArray(emb)) {\n    vectors.push(emb);\n  }\n}\n\nif (vectors.length === 0) {\n  throw new Error('No embeddings generated');\n}\n\n// 平均池化\nconst dim = vectors[0].length;\nconst averaged = new Array(dim).fill(0);\nfor (const v of vectors) {\n  for (let i = 0; i < dim; i++) {\n    averaged[i] += v[i] / vectors.length;\n  }\n}\n\n// 归一化到单位向量\nconst norm = Math.sqrt(averaged.reduce((s, x) => s + x * x, 0));\nconst normalized = norm > 0 ? averaged.map(x => x / norm) : averaged;\n\nreturn {\n  postId: items[0]?.json?.postId,\n  embedding: normalized,\n  model: 'text-embedding-3-small',\n  chunks_encoded: vectors.length\n};"
+      },
+      "id": "emb-aggregate",
+      "name": "🧮 平均池化 + 归一化",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/post/embedding",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "={{ $env.AI_WEBHOOK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "emb-store",
+      "name": "💾 写入向量库",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 嵌入完成，输出摘要\n// ──────────────────────────────────────────────\n\nconst result = $input.first().json;\n\nreturn {\n  pipeline: 'nexus-embedding',\n  status: 'stored',\n  postId: result.postId,\n  dimensions: result.dimensions,\n  model: result.model\n};"
+      },
+      "id": "emb-done",
+      "name": "✅ 记忆注入完成",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "📥 Midas 发布回调": { "main": [[{ "node": "🔍 提取 postId", "type": "main", "index": 0 }]] },
+    "🔍 提取 postId": { "main": [[{ "node": "📡 获取文章内容", "type": "main", "index": 0 }]] },
+    "📡 获取文章内容": { "main": [[{ "node": "✂️ 内容切片", "type": "main", "index": 0 }]] },
+    "✂️ 内容切片": { "main": [[{ "node": "🔄 逐块处理", "type": "main", "index": 0 }]] },
+    "🔄 逐块处理": { "main": [[{ "node": "🤖 Embedding 编码", "type": "main", "index": 0 }]] },
+    "🤖 Embedding 编码": { "main": [[{ "node": "🧮 平均池化 + 归一化", "type": "main", "index": 0 }]] },
+    "🧮 平均池化 + 归一化": { "main": [[{ "node": "💾 写入向量库", "type": "main", "index": 0 }]] },
+    "💾 写入向量库": { "main": [[{ "node": "✅ 记忆注入完成", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "embedding-v1",
+  "active": false
+}

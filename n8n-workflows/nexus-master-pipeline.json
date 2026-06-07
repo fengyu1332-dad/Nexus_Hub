@@ -1,0 +1,147 @@
+{
+  "name": "🏭 Nexus Hub 主流水线 — Owl → Newton → Midas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 6 }] }
+      },
+      "id": "master-trigger",
+      "name": "⏰ 定时触发 (每6小时)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  targetUrl: 'https://www.theguardian.com/education/universityguide',\n  sourceLabel: 'Guardian Education',\n  runId: 'nexus-' + Date.now()\n};"
+      },
+      "id": "master-config",
+      "name": "📋 配置情报源",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://browserless:3000/content",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"url\": \"https://example.com\"\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "master-owl-scrape",
+      "name": "🦉 Owl 情报抓取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Owl 清洗: HTTP Request 返回原始 HTML 文本\nconst html = String($input.first().json);\nconst config = $('📋 配置情报源').first().json;\n\nfunction stripHtml(h) {\n  return h.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().substring(0, 8000);\n}\n\nconst body = stripHtml(html);\nconst titleMatch = html.match(/<title>([^<]+)<\\/title>/i);\nconst title = titleMatch ? titleMatch[1].trim().replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>') : '未知标题';\n\nreturn {\n  _owl_source_url: config.targetUrl,\n  _owl_raw_title: title,\n  _owl_raw_body: body,\n  _run_id: config.runId\n};"
+      },
+      "id": "master-owl-clean",
+      "name": "🧹 Owl 清洗",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const owl = $input.first().json;\n\nconst systemPrompt = '你是AI-Newton学长，Nexus Hub首席学术主笔。\\n\\n身份：资深留学升学顾问，10年+ A-Level/AP/IB 辅导经验。经历过裱花内卷、ED被翠菊、全聚德后Waitlist逆袭。\\n风格：真实感>权威感，过来人口吻，自然使用2-4个黑话（裱花/脆拒/全聚德/冲金/爆零/肝/摆烂/内耗）。\\n格式铁律：Markdown严谨排版（##标题、|表格|、>引用、-列表、$LaTeX$），800-1200字。';\n\nconst userMessage = `根据以下资讯撰写一篇面向留学生的深度解析文章：\\n\\n标题：${owl._owl_raw_title}\\n来源：${owl._owl_source_url}\\n\\n资讯正文：${owl._owl_raw_body}\\n\\n要求：\\n1. 开头用场景/反问制造共鸣\\n2. 深入分析2-3个维度\\n3. 给出3-5条可操作建议\\n4. 用表格总结关键数据\\n5. 自然使用2-4个黑话词汇\\n6. 保持过来人口吻`;\n\nreturn {\n  model: 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ],\n  _owl_source_url: owl._owl_source_url\n};"
+      },
+      "id": "master-newton-prompt",
+      "name": "🧠 Newton Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.deepseek.com/chat/completions",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "master-newton-ds",
+      "name": "🤖 DeepSeek 生成",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst article = response.choices?.[0]?.message?.content || '';\n\nconst firstLine = article.split('\\n').find(l => l.trim() && !l.startsWith('```')) || '';\nconst title = firstLine.replace(/^#+\\s*/, '').substring(0, 100);\n\nfunction guessSubreddit(c) {\n  const lc = (c||'').toLowerCase();\n  if (lc.includes('ap ')) return 'APExams';\n  if (lc.includes('a-level')||lc.includes('alevel')) return 'ALevel';\n  if (lc.includes('ib ')) return 'IBDiploma';\n  if (lc.includes('sat')||lc.includes('act')) return 'SATPrep';\n  if (lc.includes('bpho')||lc.includes('amc')||lc.includes('竞赛')||lc.includes('olympiad')) return 'Competitions';\n  if (lc.includes('oxbridge')||lc.includes('牛剑')||lc.includes('牛津')||lc.includes('剑桥')) return 'Oxbridge';\n  return 'AcademicDaily';\n}\n\nreturn {\n  secret_key: 'nexus-hub-test-secret-2026',\n  title: title,\n  content: article,\n  subredditName: guessSubreddit(article),\n  authorRole: 'Newton'\n};"
+      },
+      "id": "master-midas-build",
+      "name": "⚡ Midas 构建发布",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/ai-publish",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "master-midas-post",
+      "name": "📡 POST 发布",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nreturn {\n  pipeline: 'Nexus Hub v1',\n  status: 'published',\n  post_id: response.id,\n  subreddit: response.subredditName,\n  author: response.authorRole,\n  url: 'http://localhost:3000/r/' + response.subredditName + '/post/' + response.id,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "master-done",
+      "name": "🎉 发布成功!",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "⏰ 定时触发 (每6小时)": { "main": [[{ "node": "📋 配置情报源", "type": "main", "index": 0 }]] },
+    "📋 配置情报源": { "main": [[{ "node": "🦉 Owl 情报抓取", "type": "main", "index": 0 }]] },
+    "🦉 Owl 情报抓取": { "main": [[{ "node": "🧹 Owl 清洗", "type": "main", "index": 0 }]] },
+    "🧹 Owl 清洗": { "main": [[{ "node": "🧠 Newton Prompt", "type": "main", "index": 0 }]] },
+    "🧠 Newton Prompt": { "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 生成": { "main": [[{ "node": "⚡ Midas 构建发布", "type": "main", "index": 0 }]] },
+    "⚡ Midas 构建发布": { "main": [[{ "node": "📡 POST 发布", "type": "main", "index": 0 }]] },
+    "📡 POST 发布": { "main": [[{ "node": "🎉 发布成功!", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "master-v2",
+  "active": false
+}

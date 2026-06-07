@@ -1,0 +1,77 @@
+{
+  "name": "🦉 Owl (情报雷达) — Web 抓取 + 清洗",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "owl-trigger",
+      "name": "🦉 Owl 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://browserless:3000/content",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"url\": \"={{ $json.targetUrl }}\",\n  \"rejectResourceTypes\": [\"image\", \"media\", \"font\"],\n  \"waitForTimeout\": 5000\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "owl-scrape",
+      "name": "📡 Browserless 抓取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "extractionValues": {
+          "values": [
+            {
+              "key": "title",
+              "cssSelector": "h1, article h1, .article-title",
+              "returnValue": "html"
+            },
+            {
+              "key": "body",
+              "cssSelector": "article, .article-body, .content, main",
+              "returnValue": "text"
+            },
+            {
+              "key": "date",
+              "cssSelector": "time, .date, .published",
+              "returnValue": "text"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "owl-extract",
+      "name": "🔬 HTML Extract 清洗",
+      "type": "n8n-nodes-base.htmlExtract",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Owl: 清洗与结构化输出\n// 输入: Browserless 抓取的原始 HTML\n// 输出: 清洗后的纯文本资讯摘要\n// ──────────────────────────────────────────────\n\nconst extracted = $input.first().json;\n\n// 清洗文本\nfunction cleanText(text) {\n  if (!text) return '';\n  return text\n    .replace(/\\s+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim()\n    .substring(0, 8000); // 截断过长文本以控制 Token 消耗\n}\n\nreturn {\n  // Owl 输出标准格式\n  source_url: $('🦉 Owl 启动').first().json.targetUrl || 'unknown',\n  scraped_at: new Date().toISOString(),\n  title: cleanText(extracted.title),\n  body: cleanText(extracted.body),\n  date: (extracted.date || '').trim(),\n  // 标记来源供 Sherlock 追溯\n  _owl_raw_title: extracted.title,\n  _owl_raw_body: extracted.body\n};"
+      },
+      "id": "owl-clean",
+      "name": "🧹 文本清洗 & 结构化",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "🦉 Owl 启动": { "main": [[{ "node": "📡 Browserless 抓取", "type": "main", "index": 0 }]] },
+    "📡 Browserless 抓取": { "main": [[{ "node": "🔬 HTML Extract 清洗", "type": "main", "index": 0 }]] },
+    "🔬 HTML Extract 清洗": { "main": [[{ "node": "🧹 文本清洗 & 结构化", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "owl-v1",
+  "active": false
+}

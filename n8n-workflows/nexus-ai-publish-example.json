@@ -1,0 +1,105 @@
+{
+  "name": "Nexus Hub — AI 内容发布管线 (示例)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-manual",
+      "name": "手动触发 / 定时器",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 构建 AI 发布 Payload\n// 修改此处的内容以测试不同的文章\n// ──────────────────────────────────────────────\n\nreturn {\n  secret_key: $env.AI_WEBHOOK_SECRET,\n  title: '【AI 自动生成】每日学术资讯汇总 — ' + new Date().toLocaleDateString('zh-CN'),\n  content: `## 今日学术要闻\\n\\n以下是 AI 自动抓取的学术前沿动态：\\n\\n| 领域 | 热点 | 趋势 |\\n|------|------|------|\\n| 量子计算 | 拓扑量子比特突破 | 📈 上升 |\\n| AI/ML | 大模型轻量化部署 | 📈 上升 |\\n| 材料科学 | 室温超导新进展 | ➡️ 持平 |\\n\\n## 深度解读\\n\\n> 本周 Nature 发表了关于**拓扑量子纠错**的最新研究成果，\\n> 其核心创新点在于将错误率降低了约 \\\\(40\\\\%\\\\)。\\n\\n这是继去年 Google 的量子优越性实验之后，\\n量子计算领域的又一里程碑式突破。\\n\\n## 参考代码\\n\\n量子电路模拟示例（Python）：\\n\\n\\`\\`\\`python\\nfrom qiskit import QuantumCircuit\\nqc = QuantumCircuit(2)\\nqc.h(0)\\nqc.cx(0, 1)\\nqc.measure_all()\\nprint(qc.draw())\\n\\`\\`\\``,\n  subredditName: 'AcademicDaily',\n  authorRole: 'Midas'\n};"
+      },
+      "id": "build-payload",
+      "name": "构建发布内容",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/ai-publish",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "http-post",
+      "name": "POST → AI 发布 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 解析 API 返回结果\nconst response = $input.first().json;\n\nreturn {\n  success: true,\n  postId: response.id,\n  subreddit: response.subredditName,\n  author: response.authorRole,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "parse-response",
+      "name": "解析返回结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "手动触发 / 定时器": {
+      "main": [
+        [
+          {
+            "node": "构建发布内容",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "构建发布内容": {
+      "main": [
+        [
+          {
+            "node": "POST → AI 发布 API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST → AI 发布 API": {
+      "main": [
+        [
+          {
+            "node": "解析返回结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "nexus-ai-publish-v1",
+  "active": false
+}

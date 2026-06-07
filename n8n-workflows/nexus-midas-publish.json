@@ -1,0 +1,66 @@
+{
+  "name": "⚡ Midas (分发总监) — AI 内容发布上线",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "midas-trigger",
+      "name": "⚡ Midas 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Midas: 构建最终发布 Payload\n// 输入: Sherlock 核查通过的 Markdown 内容\n// 输出: /api/ai-publish 的标准请求体\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\n\n// 从内容中提取第一行作为标题（如果不是中文标题则生成一个）\nconst firstLine = (data.content || '').split('\\n').find(l => l.trim()) || '';\nconst title = firstLine.replace(/^#+\\s*/, '').substring(0, 100) || 'AI 自动生成内容';\n\n// 根据内容主题智能选择 subreddit\nfunction guessSubreddit(content) {\n  const c = content.toLowerCase();\n  if (c.includes('ap') || c.includes('advanced placement')) return 'APExams';\n  if (c.includes('a-level') || c.includes('alevel') || c.includes('a level')) return 'ALevel';\n  if (c.includes('ib') || c.includes('international baccalaureate')) return 'IBDiploma';\n  if (c.includes('sat') || c.includes('act')) return 'SATPrep';\n  if (c.includes('toefl') || c.includes('ielts')) return 'EnglishTests';\n  if (c.includes('牛剑') || c.includes('oxbridge') || c.includes('牛津') || c.includes('剑桥')) return 'Oxbridge';\n  if (c.includes('竞赛') || c.includes('olympiad') || c.includes('bpho') || c.includes('amc')) return 'Competitions';\n  return 'AcademicDaily';\n}\n\nreturn {\n  secret_key: $env.AI_WEBHOOK_SECRET,\n  title: title,\n  content: data.content,\n  subredditName: guessSubreddit(data.content || ''),\n  authorRole: 'Midas'\n};"
+      },
+      "id": "midas-build",
+      "name": "📦 构建发布 Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/ai-publish",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "midas-post",
+      "name": "📡 POST → AI 发布 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Midas: 解析发布结果\n// ──────────────────────────────────────────────\n\nconst response = $input.first().json;\n\nreturn {\n  success: true,\n  post_id: response.id,\n  subreddit: response.subredditName,\n  author: response.authorRole,\n  published_at: new Date().toISOString(),\n  preview_url: `http://localhost:3000/r/${response.subredditName}/post/${response.id}`\n};"
+      },
+      "id": "midas-result",
+      "name": "🎉 发布成功",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "⚡ Midas 启动": { "main": [[{ "node": "📦 构建发布 Payload", "type": "main", "index": 0 }]] },
+    "📦 构建发布 Payload": { "main": [[{ "node": "📡 POST → AI 发布 API", "type": "main", "index": 0 }]] },
+    "📡 POST → AI 发布 API": { "main": [[{ "node": "🎉 发布成功", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "midas-v1",
+  "active": false
+}

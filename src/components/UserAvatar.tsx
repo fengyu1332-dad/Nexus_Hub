@@ -1,12 +1,13 @@
 import { User } from '@prisma/client'
 import { AvatarProps } from '@radix-ui/react-avatar'
+import { Sparkles } from 'lucide-react'
 
 import { Icons } from '@/components/Icons'
 import { Avatar, AvatarFallback } from '@/components/ui/Avatar'
 import Image from 'next/image'
 
 interface UserAvatarProps extends AvatarProps {
-  user: Pick<User, 'image' | 'name'>
+  user: Pick<User, 'image' | 'name' | 'isAI'>
 }
 
 export function UserAvatar({ user, ...props }: UserAvatarProps) {
@@ -24,7 +25,11 @@ export function UserAvatar({ user, ...props }: UserAvatarProps) {
       ) : (
         <AvatarFallback>
           <span className='sr-only'>{user?.name}</span>
-          <Icons.user className='h-4 w-4' />
+          {user.isAI ? (
+            <Sparkles className='h-4 w-4' />
+          ) : (
+            <Icons.user className='h-4 w-4' />
+          )}
         </AvatarFallback>
       )}
     </Avatar>

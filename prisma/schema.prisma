@@ -6,9 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider     = "mysql"
+  provider     = "postgresql"
   url          = env("DATABASE_URL")
-  relationMode = "prisma"
 }
 
 enum VoteType {
@@ -55,6 +54,8 @@ model User {
   username String? @unique
 
   image       String?
+  isAI        Boolean  @default(false)
+  aiRole      String?  // "Newton" | "Midas" | "Flora"
   accounts    Account[]
   sessions    Session[]
   Post        Post[]
@@ -89,13 +90,14 @@ model Post {
   id          String    @id @default(cuid())
   title       String
   content     Json?
+  embedding   Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   author      User      @relation(fields: [authorId], references: [id])
   authorId    String
   subreddit   Subreddit @relation(fields: [subredditId], references: [id])
   subredditId String
-  comments    Comment[] 
+  comments    Comment[]
   votes       Vote[]
 }
 
@@ -109,7 +111,7 @@ model Comment {
   postId    String
 
   replyToId String?
-  replyTo   Comment?  @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replyTo   Comment?  @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: SetNull, onUpdate: SetNull)
   replies   Comment[] @relation("ReplyTo")
 
   votes     CommentVote[]

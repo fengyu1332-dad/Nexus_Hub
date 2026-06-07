@@ -1,0 +1,218 @@
+{
+  "name": "🦉 Owl v2 — 反脆弱装甲 + 双重熔断 + 报警器",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "owl2-trigger",
+      "name": "🦉 Owl v2 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// Owl v2: 情报源配置\n// ═══════════════════════════════════════════════════\nreturn {\n  targetUrl: 'https://www.theguardian.com/education/universityguide',\n  sourceLabel: 'Guardian Education',\n  runId: 'owl-v2-' + Date.now()\n};"
+      },
+      "id": "owl2-config",
+      "name": "📋 情报源配置",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://browserless:3000/content",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={\"url\": $json.targetUrl, \"rejectResourceTypes\": [\"image\",\"media\",\"font\"], \"waitForTimeout\": 5000}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "owl2-scrape",
+      "name": "📡 Browserless 抓取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "extractionValues": {
+          "values": [
+            { "key": "title", "cssSelector": "h1, article h1, .article-title", "returnValue": "html" },
+            { "key": "body", "cssSelector": "article, .article-body, .content, main", "returnValue": "text" },
+            { "key": "rawHtml", "cssSelector": "body", "returnValue": "html" }
+          ]
+        }
+      },
+      "id": "owl2-extract",
+      "name": "🔬 HTML Extract",
+      "type": "n8n-nodes-base.htmlExtract",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// Owl v2: 清洗 + 长度计算\n// ═══════════════════════════════════════════════════\nconst extracted = $input.first().json;\nconst config = $('📋 情报源配置').first().json;\n\nconst title = (extracted.title || '').replace(/<[^>]+>/g, '').trim();\nconst body = (extracted.body || '').replace(/\\s+/g, ' ').trim();\nconst rawHtml = extracted.rawHtml || '';\n\nreturn {\n  _title: title,\n  _body: body,\n  _raw_html: rawHtml,\n  _content_length: body.length,\n  _title_length: title.length,\n  _source_url: config.targetUrl,\n  _source_label: config.sourceLabel,\n  _run_id: config.runId\n};"
+      },
+      "id": "owl2-clean",
+      "name": "🧹 清洗 + 长度检测",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-length",
+              "leftValue": "={{ $json._content_length }}",
+              "rightValue": 50,
+              "operator": { "type": "number", "operation": "larger" }
+            },
+            {
+              "id": "check-title",
+              "leftValue": "={{ $json._title_length }}",
+              "rightValue": 1,
+              "operator": { "type": "number", "operation": "larger" }
+            }
+          ]
+        }
+      },
+      "id": "owl2-if",
+      "name": "🚦 熔断器: 内容 > 50 字符?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// ✅ 抓取成功: 正常输出清洗后的数据\n// ═══════════════════════════════════════════════════\nconst data = $input.first().json;\n\nreturn {\n  _status: 'scrape_success',\n  _title: data._title,\n  _body: data._body,\n  _source_url: data._source_url,\n  _source_label: data._source_label,\n  _run_id: data._run_id\n};"
+      },
+      "id": "owl2-success",
+      "name": "✅ 抓取成功 → 送入 Newton",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// ❌ 主解析失败 → 启用 AI 启发式降级\n// 把原始 HTML 喂给 DeepSeek，让它\"猜\"出内容\n// ═══════════════════════════════════════════════════\nconst data = $input.first().json;\n\nconst rawText = (data._raw_html || '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').substring(0, 8000);\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.1,\n  max_tokens: 1024,\n  messages: [\n    {\n      role: 'system',\n      content: '你是一个网页内容提取器。网页 DOM 解析失败，请从以下杂乱文本中提取核心信息。严格输出 JSON 格式: {\"title\":\"提取的标题\",\"body\":\"提取的正文摘要(200字内)\",\"success\":true/false}。如果实在无法提取有效信息，success 设为 false。'\n    },\n    {\n      role: 'user',\n      content: `网页URL: ${data._source_url}\\n\\n原始文本:\\n${rawText}`\n    }\n  ],\n  _source_url: data._source_url,\n  _source_label: data._source_label,\n  _run_id: data._run_id\n};"
+      },
+      "id": "owl2-fallback-prompt",
+      "name": "🆘 AI 降级: 构建提取 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "owl2-fallback-ds",
+      "name": "🤖 DeepSeek 启发式提取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 解析 AI 降级结果\n// ═══════════════════════════════════════════════════\nconst response = $input.first().json;\nconst prev = $('🆘 AI 降级: 构建提取 Prompt').first().json;\nconst raw = response.choices?.[0]?.message?.content || '{}';\n\nlet extracted;\ntry {\n  const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, raw];\n  extracted = JSON.parse(m[1].trim());\n} catch {\n  extracted = { title: '', body: '', success: false };\n}\n\nreturn {\n  _status: extracted.success ? 'ai_fallback_success' : 'ai_fallback_failed',\n  _title: extracted.title || '',\n  _body: extracted.body || '',\n  _source_url: prev._source_url,\n  _source_label: prev._source_label,\n  _run_id: prev._run_id,\n  _ai_raw: raw\n};"
+      },
+      "id": "owl2-fallback-parse",
+      "name": "📊 解析 AI 降级结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 450]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-status",
+              "leftValue": "={{ $json._status }}",
+              "rightValue": "ai_fallback_success",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "owl2-fallback-if",
+      "name": "🚦 AI 提取成功?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2050, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// ✅ AI 提取成功: 输出降级数据\n// ═══════════════════════════════════════════════════\nconst data = $input.first().json;\nreturn {\n  _status: 'ai_fallback_recovered',\n  _title: data._title,\n  _body: data._body,\n  _source_url: data._source_url,\n  _source_label: data._source_label,\n  _run_id: data._run_id,\n  _warning: '数据由 AI 降级提取，非直接 DOM 解析'\n};"
+      },
+      "id": "owl2-recovered",
+      "name": "⚠️ AI 提取成功 (降级恢复)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 🚨 双重失败 → 触发报警\n// 输出报警数据给 Send Email 节点\n// ═══════════════════════════════════════════════════\nconst data = $input.first().json;\n\nreturn {\n  alert_level: 'CRITICAL',\n  alert_type: 'Owl 抓取双重失败',\n  source_url: data._source_url,\n  source_label: data._source_label,\n  failure_reason: 'DOM 解析失败 + AI 降级提取也失败',\n  timestamp: new Date().toISOString(),\n  run_id: data._run_id,\n  // Email 节点需要的字段\n  subject: `⚠️ Owl 抓取异常报警 — ${data._source_label}`,\n  body: `Owl 情报雷达发生双重熔断故障：\\n\\n- 目标URL: ${data._source_url}\\n- 来源: ${data._source_label}\\n- 时间: ${new Date().toISOString()}\\n- 原因: DOM 解析失败，AI 启发式降级也未能提取有效内容\\n\\n建议行动:\\n1. 手动访问目标 URL 确认网站是否可访问\\n2. 检查目标网站是否改版 (CSS Selector 可能已变更)\\n3. 更新 Owl 配置中的 CSS Selector\\n4. 如果网站已下线，替换情报源`\n};"
+      },
+      "id": "owl2-alert",
+      "name": "🚨 双重失败 → 报警 Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 550]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.ALERT_FROM_EMAIL }}",
+        "toEmail": "={{ $env.ALERT_TO_EMAIL }}",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.body }}"
+      },
+      "id": "owl2-email",
+      "name": "📧 发送报警邮件",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [2450, 550]
+    }
+  ],
+  "connections": {
+    "🦉 Owl v2 启动": { "main": [[{ "node": "📋 情报源配置", "type": "main", "index": 0 }]] },
+    "📋 情报源配置": { "main": [[{ "node": "📡 Browserless 抓取", "type": "main", "index": 0 }]] },
+    "📡 Browserless 抓取": { "main": [[{ "node": "🔬 HTML Extract", "type": "main", "index": 0 }]] },
+    "🔬 HTML Extract": { "main": [[{ "node": "🧹 清洗 + 长度检测", "type": "main", "index": 0 }]] },
+    "🧹 清洗 + 长度检测": { "main": [[{ "node": "🚦 熔断器: 内容 > 50 字符?", "type": "main", "index": 0 }]] },
+    "🚦 熔断器: 内容 > 50 字符?": {
+      "main": [
+        [{ "node": "✅ 抓取成功 → 送入 Newton", "type": "main", "index": 0 }],
+        [{ "node": "🆘 AI 降级: 构建提取 Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "🆘 AI 降级: 构建提取 Prompt": { "main": [[{ "node": "🤖 DeepSeek 启发式提取", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 启发式提取": { "main": [[{ "node": "📊 解析 AI 降级结果", "type": "main", "index": 0 }]] },
+    "📊 解析 AI 降级结果": { "main": [[{ "node": "🚦 AI 提取成功?", "type": "main", "index": 0 }]] },
+    "🚦 AI 提取成功?": {
+      "main": [
+        [{ "node": "⚠️ AI 提取成功 (降级恢复)", "type": "main", "index": 0 }],
+        [{ "node": "🚨 双重失败 → 报警 Payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "🚨 双重失败 → 报警 Payload": { "main": [[{ "node": "📧 发送报警邮件", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "owl-armored-v2",
+  "active": false
+}

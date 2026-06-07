@@ -1,0 +1,128 @@
+# =============================================================================
+# Nexus Hub — 本地自动化数字工厂 (Local Docker Infrastructure)
+# =============================================================================
+# 启动:  docker compose up -d
+# 停止:  docker compose down
+# 查看:  docker compose ps
+# 日志:  docker compose logs -f n8n
+# =============================================================================
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Service 1: n8n — 工作流自动化调度引擎
+  # Web UI:  http://localhost:5678
+  # ─────────────────────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: nexus-n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - N8N_USER_FOLDER=/home/node/.n8n
+      # 数据库（SQLite 持久化到挂载卷）
+      - DB_TYPE=sqlite
+      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      # Webhook URL — 用于 n8n 接收外部触发器
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      # 执行配置
+      - EXECUTIONS_DATA_PRUNE=true
+      - EXECUTIONS_DATA_MAX_AGE=168  # 保留 7 天
+      # 时区
+      - GENERIC_TIMEZONE=Asia/Shanghai
+      # 外部访问（宿主机 Next.js API）
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      # 工作流导出路径
+      - N8N_DEFAULT_LOCALE=zh_CN
+      # Nexus Hub — AI 发布密钥
+      - AI_WEBHOOK_SECRET=${AI_WEBHOOK_SECRET:-change-me}
+      # DeepSeek API
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_API_BASE=${DEEPSEEK_API_BASE:-https://api.deepseek.com/chat/completions}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      # Embedding API (OpenAI 兼容)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMBEDDING_API_BASE=${EMBEDDING_API_BASE:-https://api.openai.com/v1/embeddings}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      # Owl 报警邮件
+      - ALERT_FROM_EMAIL=${ALERT_FROM_EMAIL:-}
+      - ALERT_TO_EMAIL=${ALERT_TO_EMAIL:-}
+      # n8n 内置 SMTP
+      - N8N_EMAIL_MODE=smtp
+      - N8N_EMAIL_SMTP_HOST=${SMTP_HOST:-smtp.qq.com}
+      - N8N_EMAIL_SMTP_PORT=${SMTP_PORT:-465}
+      - N8N_EMAIL_SMTP_USER=${SMTP_USER:-}
+      - N8N_EMAIL_SMTP_PASS=${SMTP_PASS:-}
+      - N8N_EMAIL_SMTP_SECURE=${SMTP_SECURE:-true}
+      - N8N_EMAIL_FROM=${ALERT_FROM_EMAIL:-}
+    volumes:
+      # 工作流 & 凭据持久化
+      - n8n_data:/home/node/.n8n
+      # 共享目录 — 用于 n8n 写入临时文件、爬虫结果等
+      - n8n_shared:/data/shared
+    networks:
+      - nexus_network
+    extra_hosts:
+      # Docker Desktop 自动提供，显式声明以确保兼容性
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Service 2: browserless/chrome — 无头浏览器即服务
+  # API 地址: http://browserless:3000
+  # 用于 n8n 的 HTTP Request 节点调用执行网页抓取、截图等
+  # ─────────────────────────────────────────────────────────────────────────
+  browserless:
+    image: browserless/chrome:latest
+    container_name: nexus-browserless
+    restart: unless-stopped
+    ports:
+      - "${BROWSERLESS_PORT:-3333}:3000"
+    environment:
+      - CONNECTION_TIMEOUT=60000         # 连接超时 60s
+      - MAX_CONCURRENT_SESSIONS=5        # 最大并发会话
+      - MAX_QUEUE_LENGTH=10              # 最大排队请求
+      - PREBOOT_CHROME=true              # 预热 Chrome 实例
+      - KEEP_ALIVE=true                  # 保持连接
+      - ENABLE_DEBUGGER=false            # 生产环境关闭调试器
+      - TOKEN=${BROWSERLESS_TOKEN:-}     # 可选 API Token
+      - WORKSPACE_DELETE_EXPIRED=true    # 自动清理过期工作空间
+      - WORKSPACE_EXPIRE_DAYS=1          # 工作空间保留 1 天
+    volumes:
+      # 共享目录 — 浏览器可写入截图/PDF 等产物
+      - n8n_shared:/data/shared
+    networks:
+      - nexus_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+# ───────────────────────────────────────────────────────────────────────────
+# 持久化卷
+# ───────────────────────────────────────────────────────────────────────────
+volumes:
+  n8n_data:
+    name: nexus_n8n_data
+    driver: local
+  n8n_shared:
+    name: nexus_n8n_shared
+    driver: local
+
+# ───────────────────────────────────────────────────────────────────────────
+# 虚拟网络 — 服务间通过服务名互相访问
+# ───────────────────────────────────────────────────────────────────────────
+networks:
+  nexus_network:
+    name: nexus_network
+    driver: bridge

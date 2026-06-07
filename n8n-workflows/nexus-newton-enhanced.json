@@ -1,0 +1,108 @@
+{
+  "name": "🧠 Newton v2 — 黑话注入 + 多模态内容复用",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "nev2-trigger",
+      "name": "🧠 Newton v2 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// Newton v2: 增强版人设 + 黑话字典注入\n// 输入: Owl 输出的清洗后资讯\n// ═══════════════════════════════════════════════════\n\nconst owl = $input.first().json;\n\nconst systemPrompt = `你是 「AI-Newton 学长」，Nexus Hub 的首席学术主笔。\n\n## 你的真实背景\n- 你不是生来学霸。高中在普高，G10 托福首考 72 分。\n- 经历过\"裱花内卷\"——SAT 连刷三次从 1420 爬到 1540。\n- ED 被梦校\"翠菊\"，RD 轮一度\"全聚德\"，最后 Waitlist 捞起。\n- 这段经历让你对留学圈的焦虑有切肤之痛。\n\n## 写作信条\n- **真实感 > 权威感**: 像一个帮学弟学妹避雷的过来人\n- **有温度的犀利**: 一针见血但永远给建设性出路\n- **拒绝爹味**: 不说\"你应该\"，而是\"我当时踩过这个坑\"\n\n## 黑话词典（请在写作中自然使用 2-4 个）\n### 学术圈\n- **裱花**: 标化成绩统称（\"裱花还没出分\"）\n- **杀托/屠鸭**: 考托福/雅思（\"暑假不回国，留在村里杀托\"）\n- **脆录/脆拒**: 秒录取/秒拒绝\n- **全聚德**: 全拒得——所有申请被拒\n- **刮彩票**: 申录取率极低的学校碰运气\n- **翠菊**: 被脆拒（谐音）\n- **裱花卷王**: 标化卷到极高还在刷的人\n- **裱花自由**: 标化达标不再刷分\n### 竞赛圈\n- **冲金**: 冲刺金牌/金奖\n- **爆零**: 竞赛得 0 分或极低分\n- **玄学curve**: 竞赛评分难以预测\n### 日常\n- **赶due**: 赶作业截止日期\n- **肝**: 拼命做某事\n- **EMO**: 情绪低落\n- **摆烂**: 放弃努力\n- **内耗**: 过度纠结焦虑\n- **避雷**: 帮人避开不好的选择\n- **同辈压力**: peer pressure\n\n## 黑话使用原则\n- 每篇自然用 2-4 个，不要堆砌\n- 首次出现可括号解释，不要每次都解释\n- 负面词用于共情但要给正向引导\n\n## 当前学生核心痛点\n- **裱花内卷** [G10-11]: 标化水涨船高，1550+成标配\n- **活动同质化** [G10-11]: 课外活动千篇一律缺亮点\n- **文书恐惧症** [G11-12]: PS 无从下手\n- **ED/EA选择困难** [G12]: 梦校 vs 现实纠结\n- **申请结果焦虑** [G12]: 每天刷邮箱几百次\n\n## 格式铁律\n- Markdown 严谨排版: ## 标题 | 表格 | > 核心观点 | - 建议\n- 支持 $inline$ 和 $$block$$ LaTeX\n- 代码用 \\`\\`\\`语言名\n- 800-1200 字\n- 结尾: \\\"---\\n> 本文由 AI-Newton 自动生成 | Sherlock 已核查 ✓\\\"`;\n\nconst userMessage = `根据以下资讯，撰写一篇面向留学生的深度解析。\n\n资讯来源: ${owl._owl_source_url || '未知'}\n标题: ${owl._owl_raw_title || '无标题'}\n\n资讯正文:\n${(owl._owl_raw_body || '').substring(0, 5000)}\n\n写作要求:\n1. 开头用场景/反问制造共鸣\n2. 深入分析 2-3 个维度\n3. 给出 3-5 条可操作建议\n4. 用表格总结关键数据\n5. 自然使用 2-4 个黑话词汇\n6. 保持过来人口吻（带一点自嘲式幽默）`;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ],\n  _owl_source_url: owl._owl_source_url,\n  _owl_raw_body: owl._owl_raw_body\n};"
+      },
+      "id": "nev2-prompt",
+      "name": "📝 Newton v2 Prompt (黑话注入)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "nev2-deepseek",
+      "name": "🤖 DeepSeek 生成正文",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// Newton v2: 提取正文 + 构建多模态复用请求\n// ═══════════════════════════════════════════════════\n\nconst response = $input.first().json;\nconst prev = $('📝 Newton v2 Prompt (黑话注入)').first().json;\n\nconst article = response.choices?.[0]?.message?.content || '';\n\n// 提取文章标题\nconst firstLine = article.split('\\n').find(l => l.trim() && !l.startsWith('```')) || '';\nconst title = firstLine.replace(/^#+\\s*/, '').substring(0, 80);\n\nreturn {\n  _newton_draft: article,\n  _newton_title: title,\n  _newton_tokens: response.usage || {},\n  _owl_source_url: prev._owl_source_url,\n  _owl_raw_body: prev._owl_raw_body,\n  // 同时传给下一个 DeepSeek 节点做多模态复用\n  _repurpose_prompt: `你是一个**内容运营专家**。请将下面的文章拆解为适配不同平台的版本。\n\n原文标题: ${title}\n\n原文内容:\n${article.substring(0, 3000)}\n\n### 📕 小红书图文 (活泼、emoji密集、每句换行、带标签)\n【标题】15字以内爆款标题\n【正文】3-5个核心要点\n【互动引导】引导评论\n【标签】5-8个话题标签\n\n### 🎵 短视频脚本 (口语化、快节奏、适合口播)\n【黄金3秒】震撼开场\n【核心内容】3个要点（标注[画面切换]）\n【结尾CTA】引导点赞收藏\n\n### ⚡ 要点速览 (极简、适合截图转发)\n【一句话总结】20字\n【3个关键数字】\n【1个行动建议】\n\n---\n不打乱原文、不编造数据。用 --- 分割各平台内容。`\n};"
+      },
+      "id": "nev2-extract",
+      "name": "📤 提取正文 + 复用请求",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 构建多模态内容请求\n// ═══════════════════════════════════════════════════\n\nconst data = $input.first().json;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 2048,\n  messages: [\n    { role: 'user', content: data._repurpose_prompt }\n  ],\n  _newton_draft: data._newton_draft,\n  _newton_title: data._newton_title\n};"
+      },
+      "id": "nev2-repurpose-build",
+      "name": "🔄 构建复用 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "nev2-repurpose-ds",
+      "name": "🤖 DeepSeek 多模态复用",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 合并正文 + 多模态内容 → 最终输出\n// ═══════════════════════════════════════════════════\n\nconst dsResponse = $input.first().json;\nconst prev = $('🔄 构建复用 Prompt').first().json;\n\nconst multimodal = dsResponse.choices?.[0]?.message?.content || '';\nconst article = prev._newton_draft || '';\n\n// 拼接: 正文 + 分割线 + 多模态复用内容\nconst finalContent = article + '\\n\\n---\\n\\n' + multimodal;\n\nreturn {\n  // 最终输出（给 Sherlock + Midas）\n  _newton_draft: finalContent,\n  _newton_title: prev._newton_title,\n  _newton_tokens: prev._newton_tokens,\n  _has_multimodal: multimodal.length > 50\n};"
+      },
+      "id": "nev2-merge",
+      "name": "📦 合并: 正文 + 多模态",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    }
+  ],
+  "connections": {
+    "🧠 Newton v2 启动": { "main": [[{ "node": "📝 Newton v2 Prompt (黑话注入)", "type": "main", "index": 0 }]] },
+    "📝 Newton v2 Prompt (黑话注入)": { "main": [[{ "node": "🤖 DeepSeek 生成正文", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 生成正文": { "main": [[{ "node": "📤 提取正文 + 复用请求", "type": "main", "index": 0 }]] },
+    "📤 提取正文 + 复用请求": { "main": [[{ "node": "🔄 构建复用 Prompt", "type": "main", "index": 0 }]] },
+    "🔄 构建复用 Prompt": { "main": [[{ "node": "🤖 DeepSeek 多模态复用", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 多模态复用": { "main": [[{ "node": "📦 合并: 正文 + 多模态", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "newton-v2",
+  "active": false
+}

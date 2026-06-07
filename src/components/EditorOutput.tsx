@@ -2,6 +2,7 @@
 
 import CustomCodeRenderer from '@/components/renderers/CustomCodeRenderer'
 import CustomImageRenderer from '@/components/renderers/CustomImageRenderer'
+import MathRenderer from '@/components/renderers/MathRenderer'
 import { FC } from 'react'
 import dynamic from 'next/dynamic'
 
@@ -17,6 +18,7 @@ interface EditorOutputProps {
 const renderers = {
   image: CustomImageRenderer,
   code: CustomCodeRenderer,
+  math: MathRenderer,
 }
 
 const style = {
@@ -26,14 +28,36 @@ const style = {
   },
 }
 
+function normalizeContent(content: any) {
+  // Already valid EditorJS block data
+  if (content && Array.isArray(content.blocks)) {
+    return content
+  }
+  // Raw string → wrap as paragraph block
+  if (typeof content === 'string' && content.trim()) {
+    return {
+      time: Date.now(),
+      blocks: [{ type: 'paragraph', data: { text: content } }],
+      version: '2.28.0',
+    }
+  }
+  // Fallback: empty paragraph to prevent crash
+  return {
+    time: Date.now(),
+    blocks: [{ type: 'paragraph', data: { text: '(暂无内容)' } }],
+    version: '2.28.0',
+  }
+}
+
 const EditorOutput: FC<EditorOutputProps> = ({ content }) => {
+  const data = normalizeContent(content)
   return (
     // @ts-expect-error
     <Output
       style={style}
       className='text-sm'
       renderers={renderers}
-      data={content}
+      data={data}
     />
   )
 }

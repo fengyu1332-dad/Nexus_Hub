@@ -68,6 +68,7 @@ export async function PATCH(req: Request) {
             title: post.title,
             currentVote: null,
             createdAt: post.createdAt,
+            isAIGenerated: post.author.isAI,
           }
 
           await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash
@@ -104,6 +105,7 @@ export async function PATCH(req: Request) {
           title: post.title,
           currentVote: voteType,
           createdAt: post.createdAt,
+          isAIGenerated: post.author.isAI,
         }
 
         await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash
@@ -136,6 +138,7 @@ export async function PATCH(req: Request) {
         title: post.title,
         currentVote: voteType,
         createdAt: post.createdAt,
+        isAIGenerated: post.author.isAI,
       }
 
       await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash

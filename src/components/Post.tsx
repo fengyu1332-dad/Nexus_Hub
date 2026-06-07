@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { FC, useRef } from 'react'
 import EditorOutput from './EditorOutput'
 import PostVoteClient from './post-vote/PostVoteClient'
+import { AIBadge } from './AIBadge'
 
 type PartialVote = Pick<Vote, 'type'>
 
@@ -52,6 +53,7 @@ const Post: FC<PostProps> = ({
               </>
             ) : null}
             <span>Posted by u/{post.author.username}</span>{' '}
+            {post.author.isAI && <AIBadge aiRole={post.author.aiRole} />}
             {formatTimeToNow(new Date(post.createdAt))}
           </div>
           <a href={`/r/${subredditName}/post/${post.id}`}>

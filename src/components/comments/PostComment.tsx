@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { FC, useRef, useState } from 'react'
 import CommentVotes from '../CommentVotes'
 import { UserAvatar } from '../UserAvatar'
+import { AIBadge } from '../AIBadge'
 import { Button } from '../ui/Button'
 import { Label } from '../ui/Label'
 import { Textarea } from '../ui/Textarea'
@@ -75,11 +76,15 @@ const PostComment: FC<PostCommentProps> = ({
           user={{
             name: comment.author.name || null,
             image: comment.author.image || null,
+            isAI: comment.author.isAI,
           }}
           className='h-6 w-6'
         />
         <div className='ml-2 flex items-center gap-x-2'>
-          <p className='text-sm font-medium text-gray-900'>u/{comment.author.username}</p>
+          <p className='text-sm font-medium text-gray-900'>
+            u/{comment.author.username}
+            {comment.author.isAI && <AIBadge aiRole={comment.author.aiRole} />}
+          </p>
 
           <p className='max-h-40 truncate text-xs text-zinc-500'>
             {formatTimeToNow(new Date(comment.createdAt))}

@@ -1,0 +1,119 @@
+{
+  "name": "🔍 Sherlock (事实核查) — 幻觉检测 + 修正路由",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "sherlock-trigger",
+      "name": "🔍 Sherlock 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Sherlock: 构建事实核查 Prompt\n// 输入: Owl 原始数据 + Newton 草稿\n// 核心任务: 比对两边的关键信息是否一致\n// ──────────────────────────────────────────────\n\nconst input = $input.first().json;\n\nconst systemPrompt = `你是 「Sherlock 事实核查员」，Nexus Hub 的质量守门人。\n\n## 你的职责\n逐个检查文章中的每一条事实性陈述，与原始资讯进行严格比对。\n\n## 判定标准\n1. **数值幻觉**: 文章中的数字、百分比、日期是否与原文一致\n2. **名称幻觉**: 机构名、人名、专有名词是否准确\n3. **因果幻觉**: 推论逻辑是否在原文中有依据\n4. **编造幻觉**: 是否出现了原文完全没有的信息\n\n## 输出格式\n请 **只返回 JSON**，不要有任何额外文本：\n{\n  \"pass\": true/false,\n  \"issues\": [\n    { \"claim\": \"文章中的陈述\", \"source\": \"原文中的对应数据\", \"severity\": \"high/medium/low\" }\n  ],\n  \"summary\": \"一句话总结核查结果\"\n}\n\n- 如果 pass=true，表示文章准确无误，可以发布\n- 如果 pass=false，列出所有问题以便修正`;\n\nconst userMessage = `请核查以下文章的事实准确性。\n\n## 原始资讯 (Owl 来源)\n${input._owl_raw_body || input._owl_source || '无原始数据'}\n\n## 待核查文章 (Newton 草稿)\n${input._newton_draft || input.content || '无草稿'}\n\n请逐条比对并返回 JSON 判定。`;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0,\n  max_tokens: 2048,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ]\n};"
+      },
+      "id": "sherlock-build-prompt",
+      "name": "🔬 构建核查 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "sherlock-deepseek",
+      "name": "🤖 DeepSeek Chat (核查, temp=0)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Sherlock: 解析核查结果并提取判定\n// ──────────────────────────────────────────────\n\nconst response = $input.first().json;\nconst rawContent = response.choices?.[0]?.message?.content || '{}';\n\n// 尝试从回复中提取 JSON\nlet verdict;\ntry {\n  // 处理可能的 markdown 代码块包裹\n  const jsonMatch = rawContent.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || [null, rawContent];\n  verdict = JSON.parse(jsonMatch[1].trim());\n} catch {\n  // 如果解析失败，尝试直接解析\n  try {\n    verdict = JSON.parse(rawContent);\n  } catch {\n    verdict = { pass: false, issues: [{ claim: '解析失败', source: '', severity: 'high' }], summary: rawContent };\n  }\n}\n\n// 携带原始数据传递给下一个节点\nconst prevData = $('🔬 构建核查 Prompt').first().json;\n\nreturn {\n  ...prevData,  // 保留 Newton 草稿和 Owl 原始数据\n  _verdict: verdict,\n  _sherlock_pass: verdict.pass === true,\n  _sherlock_issues: verdict.issues || [],\n  _sherlock_summary: verdict.summary || ''\n};"
+      },
+      "id": "sherlock-parse",
+      "name": "📊 解析核查结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-pass",
+              "leftValue": "={{ $json._sherlock_pass }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sherlock-if",
+      "name": "🚦 幻觉检测 IF 路由",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Sherlock 修正路由: 将草稿打回 Newton 重写\n// 输出: 附有修正指示的新 Prompt\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\nconst issues = data._sherlock_issues || [];\nconst issuesText = issues.map((i, idx) =>\n  `${idx + 1}. [${i.severity}] ${i.claim}\\n   原文依据: ${i.source}`\n).join('\\n');\n\nreturn {\n  ...data,\n  _retry_count: (data._retry_count || 0) + 1,\n  _correction_prompt: `⚠️ Sherlock 发现了以下事实性问题，请修正后重新提交：\\n\\n${issuesText}\\n\\n请保持原有的写作风格和格式，只修正事实性错误。`\n};"
+      },
+      "id": "sherlock-reject",
+      "name": "❌ 打回修正 (Reject)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Sherlock 通过: 附加核查签章\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\n\n// 在文章末尾追加核查签章\nconst signedContent = (data._newton_draft || data.content || '') +\n  `\\n\\n---\\n> ✅ 本文已通过 Sherlock 事实核查 (${new Date().toISOString().slice(0, 10)})`;\n\nreturn {\n  ...data,\n  content: signedContent,\n  _sherlock_verified: true,\n  _verified_at: new Date().toISOString()\n};"
+      },
+      "id": "sherlock-approve",
+      "name": "✅ 核查通过 (Approve)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 200]
+    }
+  ],
+  "connections": {
+    "🔍 Sherlock 启动": { "main": [[{ "node": "🔬 构建核查 Prompt", "type": "main", "index": 0 }]] },
+    "🔬 构建核查 Prompt": { "main": [[{ "node": "🤖 DeepSeek Chat (核查, temp=0)", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek Chat (核查, temp=0)": { "main": [[{ "node": "📊 解析核查结果", "type": "main", "index": 0 }]] },
+    "📊 解析核查结果": { "main": [[{ "node": "🚦 幻觉检测 IF 路由", "type": "main", "index": 0 }]] },
+    "🚦 幻觉检测 IF 路由": {
+      "main": [
+        [{ "node": "✅ 核查通过 (Approve)", "type": "main", "index": 0 }],
+        [{ "node": "❌ 打回修正 (Reject)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "sherlock-v1",
+  "active": false
+}

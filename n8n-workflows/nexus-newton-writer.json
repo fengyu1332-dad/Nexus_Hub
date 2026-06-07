@@ -1,0 +1,67 @@
+{
+  "name": "🧠 Newton (主笔创作) — DeepSeek 深度文章生成",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "newton-trigger",
+      "name": "🧠 Newton 启动",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Newton: 构建 System Prompt 与 User Message\n// 输入: Owl 输出的清洗后资讯\n// 输出: DeepSeek API 请求体\n// ──────────────────────────────────────────────\n\nconst owlData = $input.first().json;\n\nconst systemPrompt = `你是 「AI-Newton 学长」，Nexus Hub 的首席学术主笔。\n\n## 你的身份\n- 一名资深留学升学顾问，拥有 10 年+ 的 A-Level / AP / IB 国际课程辅导经验\n- 精通牛剑 (Oxbridge) 和常春藤盟校的申请全流程\n- 擅长将复杂学术概念转化为中学生能理解的生动讲解\n\n## 你的写作风格\n- 学术严谨但不枯燥：用生动的类比和故事引入概念\n- 数据驱动：所有观点必须有数据或案例支撑\n- 幽默风趣：可以适当使用网络流行语和梗，但要把握好度\n\n## 格式要求 (严格遵守)\n- **必须使用 Markdown 语法**，包括：\n  - ## 二级标题 和 ### 三级标题 划分章节\n  - | 表格 | 用于对比数据 |\n  - > 引用块 用于突出核心观点\n  - - 无序列表 和 1. 有序列表 组织要点\n  - **粗体** 强调关键词，*斜体* 标注术语\n  - 使用 $E=mc^2$ 内联公式，需要时可用 $$ 块级公式\n  - 代码示例使用 \\`\\`\\` 包裹并标注语言\n- 文章长度：800-1200 字\n- 结尾添加 \"---\\n> 本文由 AI-Newton 自动生成，Sherlock 已核查 ✓\"`;\n\nconst userMessage = `请根据以下资讯，撰写一篇面向留学生的深度解析文章。\n\n## 原始资讯来源\n- 标题：${owlData.title || '无标题'}\n- 来源 URL：${owlData.source_url}\n- 发布日期：${owlData.date || '未知'}\n\n## 资讯正文\n${owlData.body || '无内容'}\n\n## 写作要求\n1. 先用一段吸引人的引言概括核心事件\n2. 深入分析事件对留学生的影响（分 2-3 个维度）\n3. 提供实用的应对建议（至少 3 条可操作建议）\n4. 用表格总结关键数据\n5. 保持 AI-Newton 学长的专属口吻`;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ]\n};"
+      },
+      "id": "newton-build-prompt",
+      "name": "📝 构建 Newton 人设 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "newton-deepseek",
+      "name": "🤖 DeepSeek Chat (生成)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Newton: 解析 DeepSeek 响应，提取 Markdown\n// ──────────────────────────────────────────────\n\nconst response = $input.first().json;\nconst owlData = $('📝 构建 Newton 人设 Prompt').first().json;\n\nconst markdown = response.choices?.[0]?.message?.content || '';\nconst tokens = response.usage || {};\n\nreturn {\n  // Newton 标准输出\n  title: owlData.messages?.[1]?.content?.split('\\n')[0]?.replace(/^##\\s*/, '') || 'AI 生成文章',\n  content: markdown,\n  author_role: 'Newton',\n  // 传递给 Sherlock 的元数据\n  _newton_draft: markdown,\n  _newton_tokens: tokens,\n  _owl_source_url: $('🧠 Newton 启动').first().json?.source_url || '',\n  _owl_raw_body: $('🧠 Newton 启动').first().json?.body || ''\n};"
+      },
+      "id": "newton-parse",
+      "name": "📤 提取 Markdown 草稿",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "🧠 Newton 启动": { "main": [[{ "node": "📝 构建 Newton 人设 Prompt", "type": "main", "index": 0 }]] },
+    "📝 构建 Newton 人设 Prompt": { "main": [[{ "node": "🤖 DeepSeek Chat (生成)", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek Chat (生成)": { "main": [[{ "node": "📤 提取 Markdown 草稿", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "newton-v1",
+  "active": false
+}
