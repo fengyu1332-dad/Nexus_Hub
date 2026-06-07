@@ -1,0 +1,155 @@
+{
+  "name": "📬 The Architect — 每周学术快报自动生成与群发",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "weeks", "weeksInterval": 1 }],
+          "triggerAtHour": 8,
+          "triggerAtMinute": 0,
+          "triggerAtDay": 0
+        }
+      },
+      "id": "arch-trigger",
+      "name": "⏰ 每周日 8:00 触发",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 计算本周时间范围\n// ═══════════════════════════════════════════════════\n\nconst now = new Date();\nconst dayOfWeek = now.getDay();\nconst daysSinceSunday = dayOfWeek === 0 ? 7 : dayOfWeek;\n\nconst weekStart = new Date(now);\nweekStart.setDate(now.getDate() - daysSinceSunday);\nweekStart.setHours(0, 0, 0, 0);\n\nconst weekEnd = new Date(now);\nweekEnd.setDate(now.getDate() - daysSinceSunday + 7);\nweekEnd.setHours(0, 0, 0, 0);\n\nreturn {\n  weekStart: weekStart.toISOString(),\n  weekEnd: weekEnd.toISOString(),\n  weekLabel: `${weekStart.getMonth() + 1}/${weekStart.getDate()} - ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`,\n  issueNumber: Math.floor((now.getTime() - new Date('2026-01-01').getTime()) / (7 * 86400000)),\n  generatedAt: now.toISOString()\n};"
+      },
+      "id": "arch-dates",
+      "name": "📅 计算本周范围",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 构建周报 Prompt — 需要拉取本周帖子\n// 通过 Next.js API 获取本周发布的所有文章\n// ═══════════════════════════════════════════════════\n\nconst dates = $input.first().json;\n\nconst systemPrompt = `你是 Nexus Hub 的 「The Architect」，中枢调度官。你的任务是将本周所有 AI 生成的文章汇编成一份精美的学术周报。\n\n## 周报风格\n- 专业但不枯燥，像一位有品位的编辑在为你精选本周必读\n- 开头用一段温暖的引语（50字内）\n- 每篇文章摘要 80-120 字，突出核心发现\n- 结尾加一句下周预告\n\n## 格式要求\n- 使用 HTML 邮件格式（适配 EDM 发送）\n- 内联 CSS 样式\n- 移动端友好的响应式布局\n- 包含 Nexus Hub 品牌色 (#f97316 橙色为主色调)\n\n## 输出格式\n直接输出完整 HTML 邮件代码，从 <!DOCTYPE html> 开始`;\n\nconst userPrompt = `请根据以下本周发布的文章，生成第 ${dates.issueNumber} 期 Nexus Hub 学术周报。\n\n本周范围: ${dates.weekLabel}\n\n## 本周文章\n{{WEEKLY_POSTS}}\n\n请生成一份精美的 HTML 邮件周报。`;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userPrompt }\n  ],\n  _weekLabel: dates.weekLabel,\n  _issueNumber: dates.issueNumber\n};"
+      },
+      "id": "arch-prompt-template",
+      "name": "📝 构建周报 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://host.docker.internal:3000/api/newsletter/weekly",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.AI_WEBHOOK_SECRET }}" }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "arch-fetch-posts",
+      "name": "📡 获取本周文章",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 将本周文章注入 Prompt 模板\n// ═══════════════════════════════════════════════════\n\nconst apiResponse = $input.first().json;\nconst posts = apiResponse.posts || [];\nconst prev = $('📝 构建周报 Prompt').first().json;\n\n// 格式化文章列表\nconst postsText = posts.length > 0\n  ? posts.map((p, i) => `${i + 1}. **${p.title}** [${p.subreddit}]\\n   ${(p.summary || p.content || '').substring(0, 300)}`).join('\\n\\n')\n  : '(本周暂无 AI 生成的文章 — 请 Owl 抓取更多资讯源)';\n\n// 注入到 user message 中\nconst userMessage = prev.messages[1].content.replace('{{WEEKLY_POSTS}}', postsText);\n\nreturn {\n  model: prev.model,\n  temperature: prev.temperature,\n  max_tokens: prev.max_tokens,\n  messages: [\n    prev.messages[0],\n    { role: 'user', content: userMessage }\n  ],\n  _weekLabel: prev._weekLabel,\n  _issueNumber: prev._issueNumber,\n  _postCount: posts.length\n};"
+      },
+      "id": "arch-build-final",
+      "name": "🔧 注入文章数据",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "arch-deepseek",
+      "name": "🤖 DeepSeek 生成周报",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 提取 HTML 邮件内容\n// ═══════════════════════════════════════════════════\n\nconst response = $input.first().json;\nconst prev = $('🔧 注入文章数据').first().json;\n\nconst htmlContent = response.choices?.[0]?.message?.content || '';\n\n// 提取 HTML 部分（去掉可能的 markdown 包裹）\nconst htmlMatch = htmlContent.match(/<!DOCTYPE[\\s\\S]*<\\/html>/i);\nconst html = htmlMatch ? htmlMatch[0] : htmlContent;\n\nreturn {\n  subject: `📬 Nexus Hub 学术周报 #${prev._issueNumber} — ${prev._weekLabel}`,\n  html: html,\n  _weekLabel: prev._weekLabel,\n  _issueNumber: prev._issueNumber,\n  _postCount: prev._postCount\n};"
+      },
+      "id": "arch-extract-html",
+      "name": "📧 提取邮件 HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.resend.com/emails",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.RESEND_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": $env.NEWSLETTER_FROM || 'Nexus Hub <newsletter@nexus-hub.vercel.app>',\n  \"subject\": $json.subject,\n  \"html\": $json.html,\n  \"to\": [\"newsletter@nexus-hub.local\"]\n}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "arch-resend",
+      "name": "📡 Resend API 发送",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 周报发送完成\n// ═══════════════════════════════════════════════════\n\nconst result = $input.first().json;\nconst prev = $('📧 提取邮件 HTML').first().json;\n\nreturn {\n  pipeline: 'architect-newsletter',\n  status: result.id ? 'sent' : 'api_response',\n  issue: prev._issueNumber,\n  week: prev._weekLabel,\n  postsIncluded: prev._postCount,\n  resendId: result.id || 'N/A',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "arch-done",
+      "name": "🎉 周报已发送",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 300]
+    }
+  ],
+  "connections": {
+    "⏰ 每周日 8:00 触发": { "main": [[{ "node": "📅 计算本周范围", "type": "main", "index": 0 }]] },
+    "📅 计算本周范围": { "main": [[{ "node": "📝 构建周报 Prompt", "type": "main", "index": 0 }]] },
+    "📝 构建周报 Prompt": { "main": [[{ "node": "📡 获取本周文章", "type": "main", "index": 0 }]] },
+    "📡 获取本周文章": { "main": [[{ "node": "🔧 注入文章数据", "type": "main", "index": 0 }]] },
+    "🔧 注入文章数据": { "main": [[{ "node": "🤖 DeepSeek 生成周报", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 生成周报": { "main": [[{ "node": "📧 提取邮件 HTML", "type": "main", "index": 0 }]] },
+    "📧 提取邮件 HTML": { "main": [[{ "node": "📡 Resend API 发送", "type": "main", "index": 0 }]] },
+    "📡 Resend API 发送": { "main": [[{ "node": "🎉 周报已发送", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "architect-v1",
+  "active": false
+}

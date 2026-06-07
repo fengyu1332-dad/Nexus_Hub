@@ -1,0 +1,127 @@
+{
+  "name": "📡 多端分发管道 — 文章 → 小红书/公众号/头条",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "omnichannel-trigger",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "omni-trigger",
+      "name": "📥 接收发布结果",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "nexus-omnichannel-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 接收 Midas 发布回传的 postId，获取完整文章\n// ═══════════════════════════════════════════════════\n\nconst pubResult = $input.first().json;\n\nreturn {\n  postId: pubResult.postId || pubResult.id,\n  title: pubResult.title || '',\n  subreddit: pubResult.subredditName || pubResult.subreddit || '',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "omni-extract",
+      "name": "🔍 提取发布信息",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://host.docker.internal:3000/api/post/embedding?postId={{ $json.postId }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.AI_WEBHOOK_SECRET }}" }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "omni-fetch",
+      "name": "📡 获取文章全文",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 构建社交分发 Prompt — 三种平台 + 核心结论\n// ═══════════════════════════════════════════════════\n\nconst post = $input.first().json;\nconst article = typeof post.embedding === 'string' ? '' : (post.content || post.title || '');\nconst title = post.title || '';\n\nconst systemPrompt = `你是 Nexus Hub 的社交分发专家。你的任务是将学术长文拆解为适配不同社交平台的版本。\n\n## 核心原则\n- 保留原文核心数据和观点，不编造新信息\n- 每条内容独立可用，不依赖原文上下文\n- 调整语调和格式以匹配各平台特色\n- 使用 Markdown 分隔各平台内容（用 --- 分割线）`;\n\nconst userPrompt = `请将下面的文章拆解为以下四个版本：\n\n## 原文标题\n${title}\n\n## 原文内容\n${(typeof article === 'string' ? article : JSON.stringify(article)).substring(0, 4000)}\n\n---\n\n## 📕 小红书图文版\n要求：\n- 标题15字以内，带emoji，要有爆款感（如\"🚨G11必看！\"）\n- 正文每句换行，emoji密集但不过度（每段1-2个）\n- 3-5个核心要点，每点2-3句话\n- 结尾引导评论（如\"你觉得呢？评论区告诉我👇\"）\n- 5-8个话题标签（#留学 #竞赛 #申请）\n- 总长度控制在500字内\n\n---\n\n## 📱 微信公众号草稿\n要求：\n- 标题30字，适合订阅号消息列表展示\n- 开头用一句话制造悬念或共鸣（\"最近很多同学问我...\"）\n- 正文分2-3个小标题（## 格式）\n- 结尾加引导关注语\n- 控制在800字内\n\n---\n\n## 📰 今日头条/知乎动态\n要求：\n- 一个引人入胜的开头（25字内，制造好奇心）\n- 2-3段核心观点陈述\n- 结尾引导点赞收藏\n- 300字内\n\n---\n\n## ⚡ 核心结论速览\n要求：\n- 一句话总结（20字）\n- 3个关键发现\n- 1个行动建议`;\n\nreturn {\n  model: $env.DEEPSEEK_MODEL || 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 3072,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userPrompt }\n  ]\n};"
+      },
+      "id": "omni-prompt",
+      "name": "📝 构建分发 Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions' }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "omni-deepseek",
+      "name": "🤖 DeepSeek 分发生成",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 解析 AI 输出 → 按平台拆分\n// ═══════════════════════════════════════════════════\n\nconst response = $input.first().json;\nconst raw = response.choices?.[0]?.message?.content || '';\n\n// 按 --- 分割线拆分为各平台内容\nconst sections = raw.split(/\\n---\\n/).filter(s => s.trim());\n\nfunction extractSection(keyword) {\n  return sections.find(s => s.includes(keyword))?.trim() || '';\n}\n\nconst xiaohongshu = extractSection('小红书') || extractSection('📕');\nconst wechat = extractSection('公众号') || extractSection('微信') || extractSection('📱');\nconst toutiao = extractSection('头条') || extractSection('知乎') || extractSection('📰');\nconst tldr = extractSection('核心结论') || extractSection('速览') || extractSection('⚡');\n\nreturn {\n  // 原始信息\n  _post_id: $('🔍 提取发布信息').first().json.postId,\n  _title: $('🔍 提取发布信息').first().json.title,\n  \n  // 各平台分发内容\n  xiaohongshu: xiaohongshu,\n  wechat_draft: wechat,\n  toutiao_dynamic: toutiao,\n  core_conclusions: tldr,\n  \n  // 元数据\n  _raw: raw,\n  _tokens: response.usage || {},\n  _generated_at: new Date().toISOString()\n};"
+      },
+      "id": "omni-parse",
+      "name": "📦 拆分各平台内容",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 分发结果汇总\n// ═══════════════════════════════════════════════════\n\nconst data = $input.first().json;\n\nconst summary = {\n  pipeline: 'omnichannel-distribution',\n  post_id: data._post_id,\n  title: data._title,\n  generated_at: data._generated_at,\n  platforms: {\n    xiaohongshu: data.xiaohongshu ? `${data.xiaohongshu.length} chars ✓` : 'not generated',\n    wechat_draft: data.wechat_draft ? `${data.wechat_draft.length} chars ✓` : 'not generated',\n    toutiao_dynamic: data.toutiao_dynamic ? `${data.toutiao_dynamic.length} chars ✓` : 'not generated',\n    core_conclusions: data.core_conclusions ? `${data.core_conclusions.length} chars ✓` : 'not generated'\n  },\n  \n  // 平台 API 分发状态（未来接入时使用）\n  distribution_status: {\n    xiaohongshu: 'manual',  // 小红书无公开API，需手动复制粘贴\n    wechat: 'manual',        // 公众号需手动粘贴到素材管理\n    toutiao: 'manual'        // 头条号需手动粘贴\n  }\n};\n\nreturn summary;"
+      },
+      "id": "omni-summary",
+      "name": "📊 分发结果汇总",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════\n// 返回分发结果给调用方\n// ═══════════════════════════════════════════════════\n\nconst data = $('📦 拆分各平台内容').first().json;\n\nreturn {\n  status: 'ok',\n  post_id: data._post_id,\n  xiaohongshu: data.xiaohongshu,\n  wechat_draft: data.wechat_draft,\n  toutiao_dynamic: data.toutiao_dynamic,\n  core_conclusions: data.core_conclusions\n};"
+      },
+      "id": "omni-response",
+      "name": "📤 返回分发内容",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    }
+  ],
+  "connections": {
+    "📥 接收发布结果": { "main": [[{ "node": "🔍 提取发布信息", "type": "main", "index": 0 }]] },
+    "🔍 提取发布信息": { "main": [[{ "node": "📡 获取文章全文", "type": "main", "index": 0 }]] },
+    "📡 获取文章全文": { "main": [[{ "node": "📝 构建分发 Prompt", "type": "main", "index": 0 }]] },
+    "📝 构建分发 Prompt": { "main": [[{ "node": "🤖 DeepSeek 分发生成", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 分发生成": { "main": [[{ "node": "📦 拆分各平台内容", "type": "main", "index": 0 }]] },
+    "📦 拆分各平台内容": { "main": [[{ "node": "📊 分发结果汇总", "type": "main", "index": 0 }]] },
+    "📊 分发结果汇总": { "main": [[{ "node": "📤 返回分发内容", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "omnichannel-v1",
+  "active": false
+}

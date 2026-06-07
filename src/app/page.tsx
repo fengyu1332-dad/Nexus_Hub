@@ -1,5 +1,6 @@
 import CustomFeed from '@/components/homepage/CustomFeed'
 import GeneralFeed from '@/components/homepage/GeneralFeed'
+import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import { getAuthSession } from '@/lib/auth'
 import { Home as HomeIcon } from 'lucide-react'
@@ -43,6 +44,9 @@ export default async function Home() {
             </Link>
           </dl>
         </div>
+
+        {/* 📬 The Architect 每周学术快报 */}
+        <NewsletterSignup />
       </div>
     </>
   )

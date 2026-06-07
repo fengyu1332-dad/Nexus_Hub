@@ -129,6 +129,28 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5678/webhook/nexus-omnichannel-trigger",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "master-omnichannel",
+      "name": "📡 触发多端分发",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2050, 300]
     }
   ],
   "connections": {
@@ -139,7 +161,8 @@
     "🧠 Newton Prompt": { "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]] },
     "🤖 DeepSeek 生成": { "main": [[{ "node": "⚡ Midas 构建发布", "type": "main", "index": 0 }]] },
     "⚡ Midas 构建发布": { "main": [[{ "node": "📡 POST 发布", "type": "main", "index": 0 }]] },
-    "📡 POST 发布": { "main": [[{ "node": "🎉 发布成功!", "type": "main", "index": 0 }]] }
+    "📡 POST 发布": { "main": [[{ "node": "🎉 发布成功!", "type": "main", "index": 0 }]] },
+    "🎉 发布成功!": { "main": [[{ "node": "📡 触发多端分发", "type": "main", "index": 0 }]] }
   },
   "settings": { "callerPolicy": "workflowsFromSameOwner" },
   "versionId": "master-v2",

@@ -137,3 +137,12 @@ model CommentVote {
 
   @@id([userId, commentId])
 }
+
+model NewsletterSubscriber {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
+  active       Boolean  @default(true)
+  confirmed    Boolean  @default(false)
+  confirmToken String?
+}
