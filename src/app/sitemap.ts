@@ -27,35 +27,39 @@ export default async function sitemap() {
   ]
 
   // ── 板块路由 ──────────────────────────────────────────
-  const subreddits = await db.subreddit.findMany({
-    select: { name: true, updatedAt: true },
-    orderBy: { updatedAt: 'desc' },
-  })
+  let subredditRoutes: any[] = []
+  let postRoutes: any[] = []
+  try {
+    const subreddits = await db.subreddit.findMany({
+      select: { name: true, updatedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    })
+    subredditRoutes = subreddits.map((s) => ({
+      url: `${BASE_URL}/r/${s.name}`,
+      lastModified: s.updatedAt,
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    }))
 
-  const subredditRoutes = subreddits.map((s) => ({
-    url: `${BASE_URL}/r/${s.name}`,
-    lastModified: s.updatedAt,
-    changeFrequency: 'daily' as const,
-    priority: 0.8,
-  }))
-
-  // ── 帖子路由 ──────────────────────────────────────────
-  const posts = await db.post.findMany({
-    select: {
-      id: true,
-      updatedAt: true,
-      subreddit: { select: { name: true } },
-    },
-    orderBy: { updatedAt: 'desc' },
-    take: 5000,
-  })
-
-  const postRoutes = posts.map((p) => ({
-    url: `${BASE_URL}/r/${p.subreddit.name}/post/${p.id}`,
-    lastModified: p.updatedAt,
-    changeFrequency: 'weekly' as const,
-    priority: 0.6,
-  }))
+    const posts = await db.post.findMany({
+      select: {
+        id: true,
+        updatedAt: true,
+        subreddit: { select: { name: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 5000,
+    })
+    postRoutes = posts.map((p) => ({
+      url: `${BASE_URL}/r/${p.subreddit.name}/post/${p.id}`,
+      lastModified: p.updatedAt,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
+    }))
+  } catch {
+    // DATABASE_URL 未配置时回退为仅首页 sitemap
+    console.warn('[sitemap] Database unavailable, generating minimal sitemap')
+  }
 
   return [...staticRoutes, ...subredditRoutes, ...postRoutes]
 }

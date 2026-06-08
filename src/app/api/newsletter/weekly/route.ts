@@ -1,5 +1,7 @@
 import { db } from '@/lib/db'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/newsletter/weekly
  * 返回本周所有 AI 生成的文章，供 The Architect 汇编周报。
