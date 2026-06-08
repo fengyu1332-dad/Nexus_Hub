@@ -1,23 +1,60 @@
-import CustomFeed from '@/components/homepage/CustomFeed'
-import GeneralFeed from '@/components/homepage/GeneralFeed'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
-import { getAuthSession } from '@/lib/auth'
+import { db } from '@/lib/db'
 import { Home as HomeIcon } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
 
 export default async function Home() {
-  const session = await getAuthSession()
+  let posts: any[] = []
+  let dbError: string | null = null
+
+  try {
+    posts = await db.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        subreddit: { select: { name: true } },
+        author: { select: { username: true, isAI: true, aiRole: true } },
+      },
+    })
+  } catch (e: any) {
+    dbError = e.message
+  }
 
   return (
     <>
-      <h1 className='font-bold text-3xl md:text-4xl'>Your feed</h1>
+      <h1 className='font-bold text-3xl md:text-4xl'>Nexus Hub</h1>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-y-4 md:gap-x-4 py-6'>
-        {/* @ts-expect-error server component */}
-        {session ? <CustomFeed /> : <GeneralFeed />}
+        <div className='col-span-2 space-y-4'>
+          {dbError ? (
+            <div className='p-4 bg-red-50 rounded border border-red-200'>
+              <p className='font-semibold text-red-700'>数据库连接失败</p>
+              <p className='text-sm text-red-500 mt-1'>{dbError}</p>
+            </div>
+          ) : posts.length === 0 ? (
+            <p className='text-zinc-500 p-4'>暂无帖子</p>
+          ) : (
+            posts.map((p) => (
+              <div key={p.id} className='bg-white rounded p-4 border'>
+                <a
+                  href={`/r/${p.subreddit.name}/post/${p.id}`}
+                  className='font-semibold hover:text-orange-500'>
+                  {p.title}
+                </a>
+                <p className='text-xs text-zinc-400 mt-1'>
+                  r/{p.subreddit.name} · u/{p.author.username}
+                  {p.author.isAI && ` · AI-${p.author.aiRole}`} ·{' '}
+                  {new Date(p.createdAt).toLocaleDateString('zh-CN')}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
 
         {/* subreddit info */}
         <div className='overflow-hidden h-fit rounded-lg border border-gray-200 order-first md:order-last'>
