@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
 import { Toaster } from '@/components/ui/Toaster'
-import { Suspense } from 'react'
 
 import '@/styles/globals.css'
 
@@ -32,9 +31,7 @@ export default function RootLayout({
         inter.className
       )}>
       <body className='min-h-screen pt-12 bg-slate-50 antialiased'>
-        <Suspense fallback={<></>}>
-          <AnalyticsProvider />
-        </Suspense>
+        <AnalyticsProvider />
         <Providers>
           {/* @ts-expect-error Server Component */}
           <Navbar />

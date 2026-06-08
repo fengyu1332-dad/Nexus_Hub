@@ -1,17 +1,13 @@
 'use client'
 
 import { useEffect } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
 
 /**
  * Nexus Hub — 流量雷达分析埋点
  *
  * 支持 PostHog (推荐) 和 Google Analytics 4 双通道
- * PostHog: 开源产品分析，跟踪用户行为、转化漏斗、Flora 对话
- * GA4: Google 搜索生态必备
+ * 无需 Suspense 边界，纯 script 注入，零依赖
  */
-
-// ── PostHog ───────────────────────────────────────
 
 function initPostHog() {
   if (typeof window === 'undefined') return
@@ -21,7 +17,6 @@ function initPostHog() {
 
   if (!key) return
 
-  // 动态加载 PostHog 脚本（避免 webpack 构建时缺少依赖报错）
   const script = document.createElement('script')
   script.src = 'https://app.posthog.com/static/js/recorder.js'
   script.async = true
@@ -30,7 +25,7 @@ function initPostHog() {
     if (ph) {
       ph.init(key, {
         api_host: host,
-        capture_pageview: false,
+        capture_pageview: true,
         capture_pageleave: true,
         autocapture: true,
         session_recording: { maskAllInputs: true },
@@ -39,8 +34,6 @@ function initPostHog() {
   }
   document.head.appendChild(script)
 }
-
-// ── Google Analytics ───────────────────────────────
 
 function initGA() {
   if (typeof window === 'undefined') return
@@ -57,46 +50,14 @@ function initGA() {
     ;(window as any).dataLayer.push(args)
   }
   gtag('js', new Date())
-  gtag('config', gaId)
+  gtag('config', gaId, { send_page_view: true })
 }
 
-// ── Provider ───────────────────────────────────────
-
-export function AnalyticsProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
-  // 初始化 PostHog
+export function AnalyticsProvider() {
   useEffect(() => {
     initPostHog()
     initGA()
   }, [])
 
-  // 页面浏览追踪
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    // PostHog pageview
-    const posthog = (window as any).posthog
-    if (posthog?.capture) {
-      posthog.capture('$pageview', {
-        path: pathname,
-        search: searchParams?.toString() || '',
-      })
-    }
-
-    // GA4 pageview
-    const gtag = (window as any).gtag
-    if (gtag) {
-      gtag('event', 'page_view', {
-        page_path: pathname + (searchParams?.toString() ? `?${searchParams}` : ''),
-      })
-    }
-  }, [pathname, searchParams])
-
-  return <>{children}</>
+  return null
 }
