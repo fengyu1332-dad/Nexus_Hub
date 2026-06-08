@@ -154,18 +154,45 @@ export const db = {
   // ═══════════════════════════════════════════════════
 
   subreddit: {
-    async findFirst(opts: { where: Filter; select?: Select }) {
-      let query = supabase
-        .from('Subreddit')
-        .select(buildSelect(opts?.select))
-
+    async findFirst(opts: {
+      where: Filter
+      select?: Select
+      include?: Record<string, any>
+    }) {
+      // 1. 先查 Subreddit
+      let query = supabase.from('Subreddit').select('*')
       for (const [col, val] of Object.entries(opts.where)) {
         query = query.eq(col, val)
       }
+      const { data: sub, error } = await query.limit(1).single()
+      if (error) {
+        if (error.code === 'PGRST116') return null
+        console.error('[db-supabase] Subreddit.findFirst error:', error)
+        throw error
+      }
+      if (!sub) return null
 
-      const { data, error } = await query.limit(1)
-      if (error) throw error
-      return data?.[0] || null
+      // 2. 处理 include
+      const result: any = { ...sub }
+      if (opts.include?.posts) {
+        const postQuery = supabase
+          .from('Post')
+          .select('*')
+          .eq('subredditId', sub.id)
+          .order('createdAt', { ascending: false })
+        if (opts.include.posts.take) {
+          postQuery.limit(opts.include.posts.take)
+        }
+        const { data: posts } = await postQuery
+        result.posts = (posts || []).map((p: any) => ({
+          ...p,
+          author: { username: 'AI', isAI: true, aiRole: null },
+          votes: [],
+          comments: [],
+          subreddit: { name: sub.name, id: sub.id },
+        }))
+      }
+      return result
     },
 
     async findMany(opts?: { select?: Select; orderBy?: OrderBy }) {
