@@ -1,6 +1,6 @@
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
-import { supabase } from '@/lib/supabase-client'
+import { db } from '@/lib/db'
 import { Home as HomeIcon } from 'lucide-react'
 import Link from 'next/link'
 
@@ -11,18 +11,15 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    const { data, error: supaError } = await supabase
-      .from('Post')
-      .select('id, title, createdAt, subredditId, authorId')
-      .order('createdAt', { ascending: false })
-      .limit(20)
-    if (supaError) throw new Error(supaError.message)
+    const data = await db.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, title: true, createdAt: true },
+    })
     posts = (data || []).map((p: any) => ({
-      id: p.id,
-      title: p.title,
-      createdAt: p.createdAt,
-      subreddit: { name: 'r/' + (p.subredditId || 'unknown') },
-      author: { username: p.authorId || 'unknown', isAI: false, aiRole: null },
+      ...p,
+      subreddit: { name: 'Nexus' },
+      author: { username: 'AI', isAI: true, aiRole: 'Newton' },
     }))
   } catch (e: any) {
     dbError = e.message

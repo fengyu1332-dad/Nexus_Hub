@@ -1,19 +1,50 @@
-import { PrismaClient } from '@prisma/client'
-import "server-only"
+import 'server-only'
 
-declare global {
-  // eslint-disable-next-line no-var, no-unused-vars
-  var cachedPrisma: PrismaClient
-}
+// ═══════════════════════════════════════════════════════
+//  自动检测运行环境:
+//    - 本地 / Docker → 使用 Prisma 直连
+//    - Vercel       → 使用 Supabase REST API
+// ═══════════════════════════════════════════════════════
 
-let prisma: PrismaClient
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient()
-} else {
-  if (!global.cachedPrisma) {
-    global.cachedPrisma = new PrismaClient()
+const isVercel =
+  process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined
+
+let _db: any = null
+
+async function getDb() {
+  if (_db) return _db
+
+  if (isVercel) {
+    const mod = await import('@/lib/db-supabase')
+    _db = mod.db
+  } else {
+    const { PrismaClient } = await import('@prisma/client')
+    const prisma = new PrismaClient()
+    _db = prisma
   }
-  prisma = global.cachedPrisma
+
+  return _db
 }
 
-export const db = prisma
+// 懒加载代理 — 首次调用时初始化
+export const db = new Proxy({} as any, {
+  get(_, prop) {
+    if (prop === '$queryRawUnsafe' || prop === '$executeRawUnsafe') {
+      return async (...args: any[]) => {
+        const d = await getDb()
+        return d[prop](...args)
+      }
+    }
+    return new Proxy({} as any, {
+      get(_, method) {
+        return async (...args: any[]) => {
+          const d = await getDb()
+          const model = d[prop]
+          if (!model)
+            throw new Error(`[db] Unknown model: ${String(prop)}`)
+          return model[method](...args)
+        }
+      },
+    })
+  },
+})
