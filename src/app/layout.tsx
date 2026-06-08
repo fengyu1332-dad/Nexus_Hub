@@ -1,3 +1,4 @@
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import Navbar from '@/components/Navbar'
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
 import { FloraChat } from '@/components/FloraChat'
@@ -38,7 +39,7 @@ export default function RootLayout({
           {authModal}
 
           <div className='container max-w-7xl mx-auto h-full pt-12'>
-            {children}
+            <ErrorBoundary>{children}</ErrorBoundary>
           </div>
         </Providers>
         <Toaster />
