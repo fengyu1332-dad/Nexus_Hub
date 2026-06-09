@@ -59,6 +59,7 @@ model User {
   image       String?
   isAI        Boolean  @default(false)
   aiRole      String?  // "Newton" | "Midas" | "Flora"
+  isAdmin     Boolean  @default(false)
   accounts    Account[]
   sessions    Session[]
   Post        Post[]

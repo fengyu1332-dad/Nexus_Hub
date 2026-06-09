@@ -223,6 +223,28 @@ export const db = {
       if (error) throw error
       return data
     },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('Post')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+
+    async delete(opts: { where: { id: string } }) {
+      const { error } = await supabase
+        .from('Post')
+        .delete()
+        .eq('id', opts.where.id)
+      if (error) throw error
+    },
   },
 
   // ═══════════════════════════════════════════════════
@@ -348,6 +370,20 @@ export const db = {
       if (error) throw error
       return data
     },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('Subreddit')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
   },
 
   // ═══════════════════════════════════════════════════
@@ -367,6 +403,67 @@ export const db = {
       const { data, error } = await query.limit(1)
       if (error) throw error
       return data?.[0] || null
+    },
+
+    async findMany(opts: {
+      where?: Filter
+      select?: Select
+      orderBy?: OrderBy
+      take?: number
+      skip?: number
+    }) {
+      let query = supabase
+        .from('User')
+        .select(buildSelect(opts?.select))
+
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
+            query = query.ilike(col, `%${(val as any).contains}%`)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('User')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+
+    async update(opts: {
+      where: { id: string }
+      data: Record<string, unknown>
+    }) {
+      const { data, error } = await supabase
+        .from('User')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
     },
   },
 
@@ -497,6 +594,20 @@ export const db = {
         .single()
       if (error) throw error
       return data
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('Comment')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
     },
   },
 

@@ -35,7 +35,22 @@ async function main() {
     )
   }
 
-  console.log('[Seed] Done — 3 AI users seeded.')
+  // Admin user
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@nexus-hub.local'
+  const adminUser = {
+    email: adminEmail,
+    username: 'admin',
+    name: 'Admin',
+    isAdmin: true,
+  }
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: { isAdmin: true },
+    create: adminUser,
+  })
+  console.log(`[Seed] Admin user "${adminEmail}" — isAdmin: true`)
+
+  console.log('[Seed] Done — 3 AI users + 1 admin seeded.')
 }
 
 main()

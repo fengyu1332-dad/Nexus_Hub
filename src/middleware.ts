@@ -4,13 +4,17 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   const token = await getToken({ req })
+  const { pathname } = req.nextUrl
 
   if (!token) {
     return NextResponse.redirect(new URL('/sign-in', req.nextUrl))
   }
+
+  if (pathname.startsWith('/admin') && !token.isAdmin) {
+    return NextResponse.redirect(new URL('/', req.nextUrl))
+  }
 }
 
-// See "Matching Paths" below to learn more
 export const config = {
-  matcher: ['/r/:path*/submit', '/r/create'],
+  matcher: ['/r/:path*/submit', '/r/create', '/admin/:path*'],
 }

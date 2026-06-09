@@ -214,4 +214,27 @@ export interface Dictionary {
     savedPosts: string
     noSavedPosts: string
   }
+  admin: {
+    dashboard: string
+    users: string
+    posts: string
+    aiAgents: string
+    systemStatus: string
+    totalUsers: string
+    totalPosts: string
+    totalComments: string
+    totalCommunities: string
+    searchUsers: string
+    delete: string
+    makeAdmin: string
+    removeAdmin: string
+    backToSite: string
+    noUsers: string
+    memberSince: string
+    database: string
+    redis: string
+    uptime: string
+    healthy: string
+    unhealthy: string
+  }
 }
