@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Flower2, Send, X, Minimize2, Maximize2, Loader2 } from 'lucide-react'
+import { Flower2, Send, X, Minimize2, Maximize2, Loader2, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDict } from '@/components/I18nProvider'
 
@@ -15,9 +15,24 @@ interface Message {
   sources?: { title: string; postId: string; subredditName?: string; similarity: number }[]
 }
 
+interface SourceItem {
+  title: string
+  postId: string
+  subredditName?: string
+  similarity: number
+}
+
 // ── Sub-components ────────────────────────────────────────
 
-function ChatBubble({ msg }: { msg: Message }) {
+function ChatBubble({
+  msg,
+  dict,
+  isStreaming,
+}: {
+  msg: Message
+  dict: any
+  isStreaming?: boolean
+}) {
   const isUser = msg.role === 'user'
 
   return (
@@ -39,12 +54,16 @@ function ChatBubble({ msg }: { msg: Message }) {
           'max-w-[80%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
           isUser
             ? 'bg-zinc-900 text-white rounded-tr-sm'
-            : 'bg-rose-50 text-zinc-800 rounded-tl-sm border border-rose-100'
+            : 'bg-rose-50 text-zinc-800 rounded-tl-sm border border-rose-100',
+          isStreaming && 'animate-pulse'
         )}>
         {msg.content}
+        {isStreaming && (
+          <span className='inline-block w-1.5 h-4 bg-rose-400 ml-0.5 animate-pulse rounded-sm' />
+        )}
 
         {/* Sources */}
-        {msg.sources && msg.sources.length > 0 && (
+        {!isStreaming && msg.sources && msg.sources.length > 0 && (
           <div className='mt-3 pt-2.5 border-t border-rose-200/50'>
             <p className='text-[10px] text-rose-400 font-medium mb-2 uppercase tracking-wide'>
               {dict.flora.sources}
@@ -86,14 +105,17 @@ export function FloraChat() {
     },
   ])
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingContent, setStreamingContent] = useState('')
+  const [streamingSources, setStreamingSources] = useState<SourceItem[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages or streaming content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, streamingContent])
 
   // Focus input on open
   useEffect(() => {
@@ -104,7 +126,7 @@ export function FloraChat() {
 
   const sendMessage = useCallback(async () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isStreaming) return
 
     const userMsg: Message = {
       id: 'u-' + Date.now(),
@@ -124,27 +146,132 @@ export function FloraChat() {
 
     setMessages((prev) => [...prev, userMsg])
     setInput('')
-    setIsLoading(true)
+    setIsStreaming(true)
+    setStreamingContent('')
+    setStreamingSources([])
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, history }),
+        signal: controller.signal,
       })
 
-      const data = await res.json()
-
-      const floraMsg: Message = {
-        id: 'f-' + Date.now(),
-        role: 'flora',
-        content: data.reply || dict.flora.errorReply,
-        timestamp: Date.now(),
-        sources: data.sources,
+      // 非流式回退
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('text/event-stream')) {
+        const data = await res.json()
+        setIsStreaming(false)
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: 'f-' + Date.now(),
+            role: 'flora',
+            content: data.reply || dict.flora.errorReply,
+            timestamp: Date.now(),
+            sources: data.sources,
+          },
+        ])
+        return
       }
 
-      setMessages((prev) => [...prev, floraMsg])
-    } catch {
+      // 流式读取
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let sources: SourceItem[] = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed || !trimmed.startsWith('data:')) continue
+
+          const data = trimmed.slice(5).trim()
+          if (data === '[DONE]') {
+            // Stream complete — push final message
+            setIsStreaming(false)
+            setStreamingContent((prev) => {
+              setMessages((prevMsgs) => [
+                ...prevMsgs,
+                {
+                  id: 'f-' + Date.now(),
+                  role: 'flora',
+                  content: prev,
+                  timestamp: Date.now(),
+                  sources,
+                },
+              ])
+              return ''
+            })
+            setStreamingSources([])
+            return
+          }
+
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.type === 'sources') {
+              sources = parsed.data || []
+              setStreamingSources(sources)
+            } else if (parsed.type === 'delta' && parsed.content) {
+              setStreamingContent((prev) => prev + parsed.content)
+            }
+          } catch {
+            // skip unparseable frames
+          }
+        }
+      }
+
+      // Stream ended without [DONE] — push whatever we got
+      setIsStreaming(false)
+      setStreamingContent((prev) => {
+        if (prev) {
+          setMessages((prevMsgs) => [
+            ...prevMsgs,
+            {
+              id: 'f-' + Date.now(),
+              role: 'flora',
+              content: prev,
+              timestamp: Date.now(),
+              sources,
+            },
+          ])
+        }
+        return ''
+      })
+      setStreamingSources([])
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        // User stopped — save partial content
+        setIsStreaming(false)
+        setStreamingContent((prev) => {
+          if (prev) {
+            setMessages((prevMsgs) => [
+              ...prevMsgs,
+              {
+                id: 'f-' + Date.now(),
+                role: 'flora',
+                content: prev,
+                timestamp: Date.now(),
+                sources: [],
+              },
+            ])
+          }
+          return ''
+        })
+        return
+      }
+      setIsStreaming(false)
       setMessages((prev) => [
         ...prev,
         {
@@ -155,9 +282,13 @@ export function FloraChat() {
         },
       ])
     } finally {
-      setIsLoading(false)
+      abortRef.current = null
     }
-  }, [input, isLoading])
+  }, [input, isStreaming, messages, dict])
+
+  const stopGenerating = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -196,7 +327,7 @@ export function FloraChat() {
           <div>
             <p className='text-sm font-semibold leading-tight'>{dict.flora.name}</p>
             <p className='text-[10px] text-white/70 leading-tight'>
-              {isLoading ? dict.flora.typing : dict.flora.online}
+              {isStreaming ? dict.flora.streaming : dict.flora.online}
             </p>
           </div>
         </div>
@@ -226,11 +357,26 @@ export function FloraChat() {
         <>
           <div className='flex-1 overflow-y-auto px-3 py-4 bg-zinc-50/50'>
             {messages.map((msg) => (
-              <ChatBubble key={msg.id} msg={msg} />
+              <ChatBubble key={msg.id} msg={msg} dict={dict} />
             ))}
 
-            {/* Loading indicator */}
-            {isLoading && (
+            {/* Streaming bubble */}
+            {isStreaming && streamingContent && (
+              <ChatBubble
+                msg={{
+                  id: 'streaming',
+                  role: 'flora',
+                  content: streamingContent,
+                  timestamp: Date.now(),
+                  sources: streamingSources,
+                }}
+                dict={dict}
+                isStreaming
+              />
+            )}
+
+            {/* Loading indicator (before first token) */}
+            {isStreaming && !streamingContent && (
               <div className='flex items-center gap-2 mb-3'>
                 <div className='w-7 h-7 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center'>
                   <Flower2 className='h-3.5 w-3.5 text-white' />
@@ -258,19 +404,24 @@ export function FloraChat() {
                 onKeyDown={handleKeyDown}
                 placeholder={dict.flora.placeholder}
                 rows={1}
-                disabled={isLoading}
+                disabled={isStreaming}
                 className='flex-1 resize-none rounded-xl border border-zinc-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300 disabled:opacity-50 placeholder:text-zinc-400'
               />
-              <button
-                onClick={sendMessage}
-                disabled={!input.trim() || isLoading}
-                className='flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-r from-rose-400 to-pink-500 text-white flex items-center justify-center hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all'>
-                {isLoading ? (
-                  <Loader2 className='h-4 w-4 animate-spin' />
-                ) : (
+              {isStreaming ? (
+                <button
+                  onClick={stopGenerating}
+                  title={dict.flora.stopGenerating}
+                  className='flex-shrink-0 w-9 h-9 rounded-xl bg-zinc-500 text-white flex items-center justify-center hover:bg-zinc-600 hover:shadow-md transition-all'>
+                  <Square className='h-3.5 w-3.5' />
+                </button>
+              ) : (
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim()}
+                  className='flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-r from-rose-400 to-pink-500 text-white flex items-center justify-center hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all'>
                   <Send className='h-4 w-4' />
-                )}
-              </button>
+                </button>
+              )}
             </div>
             <p className='text-[10px] text-zinc-400 mt-1.5 text-center'>
               {dict.flora.footer}

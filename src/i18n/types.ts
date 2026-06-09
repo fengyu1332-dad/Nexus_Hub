@@ -137,6 +137,8 @@ export interface Dictionary {
     sources: string
     readMore: string
     welcomeMessage: string
+    stopGenerating: string
+    streaming: string
   }
   toast: {
     error: string

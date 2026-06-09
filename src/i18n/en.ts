@@ -137,6 +137,8 @@ export const en: Dictionary = {
     sources: 'References',
     readMore: 'Read more →',
     welcomeMessage: "Hi! 👋 I'm Flora~\n\nWhether you want to learn about a competition, are torn between schools, or just need someone to talk to—I'm here for you.\n\nI'll combine the best articles on the site to give you the most practical advice 🌸",
+    stopGenerating: 'Stop generating',
+    streaming: 'Streaming...',
   },
   toast: {
     error: 'Error',

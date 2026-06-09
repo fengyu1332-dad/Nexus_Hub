@@ -64,6 +64,19 @@ const Post: FC<PostProps> = ({
               u/{post.author.username}
             </Link>{' '}
             {post.author.isAI && <AIBadge aiRole={post.author.aiRole} />}
+            {post.author.isAI && (
+              <span
+                className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                  _votesAmt >= 3
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : _votesAmt >= 0
+                    ? 'bg-zinc-100 text-zinc-500'
+                    : 'bg-red-100 text-red-600'
+                }`}
+                title={`${_votesAmt} votes`}>
+                {_votesAmt >= 3 ? '↑' : _votesAmt < 0 ? '↓' : '·'}{_votesAmt}
+              </span>
+            )}
             {formatTimeToNow(new Date(post.createdAt), locale)}
           </div>
           <a href={`/r/${subredditName}/post/${post.id}`}>

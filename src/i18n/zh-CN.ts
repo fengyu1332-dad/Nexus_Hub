@@ -137,6 +137,8 @@ export const zhCN: Dictionary = {
     sources: '参考文章',
     readMore: '阅读原文 →',
     welcomeMessage: '嗨！👋 我是 Flora 学姐~\n\n不管你是想了解某个竞赛、纠结选校、还是单纯压力大想找人聊聊，都可以随时找我。\n\n我会结合站内已经发布的干货文章，给你最实用的建议 🌸',
+    stopGenerating: '停止生成',
+    streaming: '正在输入...',
   },
   toast: {
     error: '错误',
