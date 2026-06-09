@@ -7,12 +7,14 @@ import { FC } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/use-toast'
 import { Icons } from './Icons'
+import { useDict } from '@/components/I18nProvider'
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 const UserAuthForm: FC<UserAuthFormProps> = ({ className, ...props }) => {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = React.useState<boolean>(false)
+  const dict = useDict()
 
   const loginWithGoogle = async () => {
     setIsLoading(true)
@@ -21,8 +23,8 @@ const UserAuthForm: FC<UserAuthFormProps> = ({ className, ...props }) => {
       await signIn('google')
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'There was an error logging in with Google',
+        title: dict.toast.error,
+        description: dict.toast.googleLoginError,
         variant: 'destructive',
       })
     } finally {
@@ -40,7 +42,7 @@ const UserAuthForm: FC<UserAuthFormProps> = ({ className, ...props }) => {
         onClick={loginWithGoogle}
         disabled={isLoading}>
         {isLoading ? null : <Icons.google className='h-4 w-4 mr-2' />}
-        Google
+        {dict.auth.google}
       </Button>
     </div>
   )

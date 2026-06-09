@@ -1,5 +1,6 @@
 import MiniCreatePost from '@/components/MiniCreatePost'
 import PostFeed from '@/components/PostFeed'
+import SortSelector from '@/components/SortSelector'
 import { INFINITE_SCROLL_PAGINATION_RESULTS } from '@/config'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -7,38 +8,46 @@ import { db } from '@/lib/db'
 export const revalidate = 60
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { getDictionary } from '@/i18n'
 
 interface PageProps {
   params: {
     slug: string
   }
+  searchParams: { sort?: string }
 }
 
-// ── 动态 SEO Metadata ─────────────────────────────────────
+// ── Dynamic SEO Metadata ─────────────────────────────────────
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const dict = getDictionary()
   const subreddit = await db.subreddit.findFirst({
     where: { name: params.slug },
     select: { name: true },
   })
 
-  if (!subreddit) return { title: 'Community Not Found — Nexus Hub' }
+  if (!subreddit) return { title: dict.metadata.communityNotFound }
 
   return {
-    title: `r/${subreddit.name} — 留学学术社区 | Nexus Hub`,
-    description: `浏览 r/${subreddit.name} 板块中的留学申请、国际课程备考和学术竞赛讨论。由 AI 学长和真实用户共同创作。`,
-    openGraph: {
-      title: `r/${subreddit.name} — Nexus Hub`,
-      description: `留学申请 · 国际课程 · 学术竞赛 · 高质量 UGC + AI 内容`,
-      type: 'website',
-    },
+    title: `r/${subreddit.name} — ${dict.metadata.titleSuffix}`,
+    description: `r/${subreddit.name}`,
   }
 }
 
-const page = async ({ params }: PageProps) => {
+const page = async ({ params, searchParams }: PageProps) => {
   const { slug } = params
+  const sort = searchParams.sort || 'new'
 
   const session = await getAuthSession()
+
+  let orderBy: Record<string, string>
+  if (sort === 'hot') {
+    orderBy = { hotScore: 'desc' }
+  } else if (sort === 'top') {
+    orderBy = { voteCount: 'desc' }
+  } else {
+    orderBy = { createdAt: 'desc' }
+  }
 
   const subreddit = await db.subreddit.findFirst({
     where: { name: slug },
@@ -50,9 +59,7 @@ const page = async ({ params }: PageProps) => {
           comments: true,
           subreddit: true,
         },
-        orderBy: {
-          createdAt: 'desc'
-        },
+        orderBy,
         take: INFINITE_SCROLL_PAGINATION_RESULTS,
       },
     },
@@ -60,13 +67,35 @@ const page = async ({ params }: PageProps) => {
 
   if (!subreddit) return notFound()
 
+  // Fetch bookmarks for current user
+  let savedPostIds: Set<string> | undefined
+  if (session?.user) {
+    try {
+      const bookmarks = await db.bookmark.findMany({
+        where: { userId: session.user.id },
+        select: { postId: true },
+      })
+      savedPostIds = new Set(bookmarks.map((b: any) => b.postId))
+    } catch {
+      // Bookmark table may not exist yet
+    }
+  }
+
   return (
     <>
       <h1 className='font-bold text-3xl md:text-4xl h-14'>
         r/{subreddit.name}
       </h1>
+      <div className='mb-4'>
+        <SortSelector />
+      </div>
       <MiniCreatePost session={session} />
-      <PostFeed initialPosts={subreddit.posts} subredditName={subreddit.name} />
+      <PostFeed
+        initialPosts={subreddit.posts}
+        subredditName={subreddit.name}
+        sort={sort}
+        savedPostIds={savedPostIds}
+      />
     </>
   )
 }

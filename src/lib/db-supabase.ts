@@ -88,6 +88,8 @@ export const db = {
             query = query.ilike(col, `${(val as any).startsWith}%`)
           } else if (typeof val === 'object' && val !== null && 'gte' in (val as any)) {
             query = query.gte(col, (val as any).gte)
+          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
           } else {
             query = query.eq(col, val)
           }
@@ -257,7 +259,17 @@ export const db = {
           .from('Post')
           .select('*')
           .eq('subredditId', sub.id)
-          .order('createdAt', { ascending: false })
+
+        // Dynamic orderBy from include.posts.orderBy
+        const postsOrderBy = opts.include.posts.orderBy
+        if (postsOrderBy) {
+          for (const [col, dir] of Object.entries(postsOrderBy)) {
+            postQuery.order(col, { ascending: dir === 'asc' })
+          }
+        } else {
+          postQuery.order('createdAt', { ascending: false })
+        }
+
         if (opts.include.posts.take) {
           postQuery.limit(opts.include.posts.take)
         }
@@ -408,6 +420,34 @@ export const db = {
         return data
       }
     },
+
+    async delete(opts: {
+      where: { userId_postId: { userId: string; postId: string } }
+    }) {
+      const { userId, postId } = opts.where.userId_postId
+      const { error } = await supabase
+        .from('Vote')
+        .delete()
+        .eq('userId', userId)
+        .eq('postId', postId)
+      if (error) throw error
+    },
+
+    async update(opts: {
+      where: { userId_postId: { userId: string; postId: string } }
+      data: Record<string, unknown>
+    }) {
+      const { userId, postId } = opts.where.userId_postId
+      const { data, error } = await supabase
+        .from('Vote')
+        .update(opts.data)
+        .eq('userId', userId)
+        .eq('postId', postId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
   },
 
   // ═══════════════════════════════════════════════════
@@ -432,6 +472,31 @@ export const db = {
       const { data, error } = await query
       if (error) throw error
       return data || []
+    },
+
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase
+        .from('Comment')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = { id: generateId(), createdAt: new Date().toISOString(), ...opts.data }
+      const { data, error } = await supabase
+        .from('Comment')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
     },
   },
 
@@ -550,6 +615,175 @@ export const db = {
         .delete()
         .eq('userId', userId)
         .eq('subredditId', subredditId)
+      if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  Notification
+  // ═══════════════════════════════════════════════════
+
+  notification: {
+    async findMany(opts: {
+      where: Filter
+      orderBy?: OrderBy | OrderBy[]
+      take?: number
+      include?: Record<string, any>
+    }) {
+      let query = supabase
+        .from('Notification')
+        .select(buildSelect(opts?.include ? undefined : undefined))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      // Handle orderBy as object or array
+      const orders = Array.isArray(opts.orderBy)
+        ? opts.orderBy
+        : opts.orderBy ? [opts.orderBy] : []
+      for (const o of orders) {
+        for (const [col, dir] of Object.entries(o)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+
+      if (opts?.take) query = query.limit(opts.take)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      // Resolve include.fromUser
+      if (opts?.include?.fromUser && data) {
+        const userIds = [...new Set(data.map((n: any) => n.fromUserId))]
+        const userMap = new Map()
+        for (const uid of userIds) {
+          const { data: u } = await supabase
+            .from('User')
+            .select('username,image')
+            .eq('id', uid)
+            .limit(1)
+          if (u?.[0]) userMap.set(uid, u[0])
+        }
+        return data.map((n: any) => ({
+          ...n,
+          fromUser: userMap.get(n.fromUserId) || { username: null, image: null },
+        }))
+      }
+
+      return data || []
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = { id: generateId(), createdAt: new Date().toISOString(), read: false, ...opts.data }
+      const { data, error } = await supabase
+        .from('Notification')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async count(opts: { where: Filter }) {
+      const { count, error } = await supabase
+        .from('Notification')
+        .select('id', { count: 'exact', head: true })
+        .eq('userId', opts.where.userId as string)
+        .eq('read', opts.where.read as boolean)
+      if (error) throw error
+      return count || 0
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('Notification')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async updateMany(opts: { where: Filter; data: Record<string, unknown> }) {
+      let query = supabase
+        .from('Notification')
+        .update(opts.data)
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { error } = await query
+      if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  Bookmark
+  // ═══════════════════════════════════════════════════
+
+  bookmark: {
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase
+        .from('Bookmark')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async findMany(opts: {
+      where: Filter
+      select?: Select
+      orderBy?: OrderBy
+      take?: number
+    }) {
+      let query = supabase
+        .from('Bookmark')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+
+      if (opts?.take) query = query.limit(opts.take)
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = { createdAt: new Date().toISOString(), ...opts.data }
+      const { data, error } = await supabase
+        .from('Bookmark')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async delete(opts: {
+      where: { userId_postId: { userId: string; postId: string } }
+    }) {
+      const { userId, postId } = opts.where.userId_postId
+      const { error } = await supabase
+        .from('Bookmark')
+        .delete()
+        .eq('userId', userId)
+        .eq('postId', postId)
       if (error) throw error
     },
   },

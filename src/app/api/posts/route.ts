@@ -23,16 +23,18 @@ export async function GET(req: Request) {
   }
 
   try {
-    const { limit, page, subredditName } = z
+    const { limit, page, subredditName, sort } = z
       .object({
         limit: z.string(),
         page: z.string(),
         subredditName: z.string().nullish().optional(),
+        sort: z.enum(['new', 'hot', 'top']).nullish().optional(),
       })
       .parse({
         subredditName: url.searchParams.get('subredditName'),
         limit: url.searchParams.get('limit'),
         page: url.searchParams.get('page'),
+        sort: url.searchParams.get('sort'),
       })
 
     let whereClause = {}
@@ -53,12 +55,19 @@ export async function GET(req: Request) {
       }
     }
 
+    let orderBy: Record<string, string>
+    if (sort === 'hot') {
+      orderBy = { hotScore: 'desc' }
+    } else if (sort === 'top') {
+      orderBy = { voteCount: 'desc' }
+    } else {
+      orderBy = { createdAt: 'desc' }
+    }
+
     const posts = await db.post.findMany({
       take: parseInt(limit),
-      skip: (parseInt(page) - 1) * parseInt(limit), // skip should start from 0 for page 1
-      orderBy: {
-        createdAt: 'desc',
-      },
+      skip: (parseInt(page) - 1) * parseInt(limit),
+      orderBy,
       include: {
         subreddit: true,
         votes: true,

@@ -1,19 +1,24 @@
+'use client'
+
 import { buttonVariants } from '@/components/ui/Button'
 import { toast } from '@/hooks/use-toast'
 import Link from 'next/link'
+import { useDict } from '@/components/I18nProvider'
 
 export const useCustomToasts = () => {
+  const dict = useDict()
+
   const loginToast = () => {
     const { dismiss } = toast({
-      title: 'Login required.',
-      description: 'You need to be logged in to do that.',
+      title: dict.toast.loginRequired,
+      description: dict.toast.needLoginDescription,
       variant: 'destructive',
       action: (
         <Link
           onClick={() => dismiss()}
           href='/sign-in'
           className={buttonVariants({ variant: 'outline' })}>
-          Login
+          {dict.toast.login}
         </Link>
       ),
     })

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/Command'
 import { useOnClickOutside } from '@/hooks/use-on-click-outside'
 import { FileText, Users } from 'lucide-react'
+import { useDict } from '@/components/I18nProvider'
 
 interface SearchBarProps {}
 
@@ -37,6 +38,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
   const pathname = usePathname()
   const commandRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const dict = useDict()
 
   useOnClickOutside(commandRef, () => {
     setInput('')
@@ -86,14 +88,14 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
         }}
         value={input}
         className='outline-none border-none focus:border-none focus:outline-none ring-0'
-        placeholder='Search posts & communities...'
+        placeholder={dict.search.placeholder}
       />
 
       {input.length > 0 && (
         <CommandList className='absolute bg-white top-full inset-x-0 shadow rounded-b-md max-h-72 overflow-y-auto'>
-          {isFetched && !hasResults && <CommandEmpty>No results found.</CommandEmpty>}
+          {isFetched && !hasResults && <CommandEmpty>{dict.search.noResults}</CommandEmpty>}
           {hasCommunities && (
-            <CommandGroup heading='Communities'>
+            <CommandGroup heading={dict.search.communities}>
               {queryResults!.communities.map((sub) => (
                 <CommandItem
                   onSelect={(e) => {
@@ -110,7 +112,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
           )}
           {hasCommunities && hasPosts && <CommandSeparator />}
           {hasPosts && (
-            <CommandGroup heading='Posts'>
+            <CommandGroup heading={dict.search.posts}>
               {queryResults!.posts.map((post) => (
                 <CommandItem
                   onSelect={() => {

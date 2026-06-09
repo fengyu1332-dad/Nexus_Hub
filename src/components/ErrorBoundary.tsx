@@ -5,6 +5,7 @@ import { Component, type ReactNode } from 'react'
 interface ErrorBoundaryProps {
   children: ReactNode
   fallback?: ReactNode
+  fallbackMessage?: string
 }
 
 interface ErrorBoundaryState {
@@ -30,7 +31,9 @@ export class ErrorBoundary extends Component<
       return (
         this.props.fallback || (
           <div className='p-8 text-center'>
-            <p className='text-zinc-500 text-sm'>页面加载出错，请刷新重试</p>
+            <p className='text-zinc-500 text-sm'>
+              {this.props.fallbackMessage || '页面加载出错，请刷新重试'}
+            </p>
           </div>
         )
       )

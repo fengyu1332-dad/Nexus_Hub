@@ -10,6 +10,7 @@ import { useMutation } from '@tanstack/react-query'
 import axios, { AxiosError } from 'axios'
 import { ArrowBigDown, ArrowBigUp } from 'lucide-react'
 import { FC, useState } from 'react'
+import { useDict } from '@/components/I18nProvider'
 
 interface CommentVotesProps {
   commentId: string
@@ -30,6 +31,7 @@ const CommentVotes: FC<CommentVotesProps> = ({
     _currentVote
   )
   const prevVote = usePrevious(currentVote)
+  const dict = useDict()
 
   const { mutate: vote } = useMutation({
     mutationFn: async (type: VoteType) => {
@@ -54,8 +56,8 @@ const CommentVotes: FC<CommentVotesProps> = ({
       }
 
       return toast({
-        title: 'Something went wrong.',
-        description: 'Your vote was not registered. Please try again.',
+        title: dict.toast.somethingWentWrong,
+        description: dict.toast.voteNotRegistered,
         variant: 'destructive',
       })
     },

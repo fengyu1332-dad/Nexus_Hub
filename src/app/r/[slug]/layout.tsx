@@ -3,6 +3,7 @@ import ToFeedButton from '@/components/ToFeedButton'
 import { buttonVariants } from '@/components/ui/Button'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDictionary } from '@/i18n'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
 import Link from 'next/link'
@@ -10,8 +11,8 @@ import { notFound } from 'next/navigation'
 import { ReactNode } from 'react'
 
 export const metadata: Metadata = {
-  title: 'Breadit',
-  description: 'A Reddit clone built with Next.js and TypeScript.',
+  title: 'Nexus Hub',
+  description: 'AI-powered academic community.',
 }
 
 const Layout = async ({
@@ -21,6 +22,7 @@ const Layout = async ({
   children: ReactNode
   params: { slug: string }
 }) => {
+  const dict = getDictionary()
   const session = await getAuthSession()
 
   const subreddit = await db.subreddit.findFirst({
@@ -75,11 +77,13 @@ const Layout = async ({
           {/* info sidebar */}
           <div className='overflow-hidden h-fit rounded-lg border border-gray-200 order-first md:order-last'>
             <div className='px-6 py-4'>
-              <p className='font-semibold py-3'>About r/{subreddit.name}</p>
+              <p className='font-semibold py-3'>
+                {dict.community.about} r/{subreddit.name}
+              </p>
             </div>
             <dl className='divide-y divide-gray-100 px-6 py-4 text-sm leading-6 bg-white'>
               <div className='flex justify-between gap-x-4 py-3'>
-                <dt className='text-gray-500'>Created</dt>
+                <dt className='text-gray-500'>{dict.community.created}</dt>
                 <dd className='text-gray-700'>
                   <time dateTime={new Date(subreddit.createdAt).toDateString()}>
                     {format(new Date(subreddit.createdAt), 'MMMM d, yyyy')}
@@ -87,14 +91,14 @@ const Layout = async ({
                 </dd>
               </div>
               <div className='flex justify-between gap-x-4 py-3'>
-                <dt className='text-gray-500'>Members</dt>
+                <dt className='text-gray-500'>{dict.community.members}</dt>
                 <dd className='flex items-start gap-x-2'>
                   <div className='text-gray-900'>{memberCount}</div>
                 </dd>
               </div>
               {subreddit.creatorId === session?.user?.id ? (
                 <div className='flex justify-between gap-x-4 py-3'>
-                  <dt className='text-gray-500'>You created this community</dt>
+                  <dt className='text-gray-500'>{dict.community.youCreated}</dt>
                 </div>
               ) : null}
 
@@ -111,7 +115,7 @@ const Layout = async ({
                   className: 'w-full mb-6',
                 })}
                 href={`r/${slug}/submit`}>
-                Create Post
+                {dict.community.createPost}
               </Link>
             </dl>
           </div>

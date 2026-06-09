@@ -11,6 +11,7 @@ import { toast } from '../../hooks/use-toast'
 import { Button } from '../ui/Button'
 import { ArrowBigDown, ArrowBigUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useDict } from '@/components/I18nProvider'
 
 interface PostVoteClientProps {
   postId: string
@@ -27,6 +28,7 @@ const PostVoteClient = ({
   const [votesAmt, setVotesAmt] = useState<number>(initialVotesAmt)
   const [currentVote, setCurrentVote] = useState(initialVote)
   const prevVote = usePrevious(currentVote)
+  const dict = useDict()
 
   // ensure sync with server
   useEffect(() => {
@@ -56,8 +58,8 @@ const PostVoteClient = ({
       }
 
       return toast({
-        title: 'Something went wrong.',
-        description: 'Your vote was not registered. Please try again.',
+        title: dict.toast.somethingWentWrong,
+        description: dict.toast.voteNotRegistered,
         variant: 'destructive',
       })
     },

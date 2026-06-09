@@ -48,9 +48,11 @@ model User {
   name              String?
   email             String?        @unique
   emailVerified     DateTime?
-  createdSubreddits Subreddit[]    @relation("CreatedBy")
-  subscriptions     Subscription[]
-  votes             Vote[]
+  createdSubreddits       Subreddit[]          @relation("CreatedBy")
+  subscriptions           Subscription[]
+  votes                   Vote[]
+  notifications           Notification[]       @relation("NotificationFrom")
+  receivedNotifications   Notification[]
 
   username String? @unique
 
@@ -62,6 +64,7 @@ model User {
   Post        Post[]
   Comment     Comment[]
   CommentVote CommentVote[]
+  Bookmark    Bookmark[]
 }
 
 model Subreddit {
@@ -94,12 +97,15 @@ model Post {
   embedding   Json?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  voteCount   Int       @default(0)
+  hotScore    Float?
   author      User      @relation(fields: [authorId], references: [id])
   authorId    String
   subreddit   Subreddit @relation(fields: [subredditId], references: [id])
   subredditId String
   comments    Comment[]
   votes       Vote[]
+  bookmarks   Bookmark[]
 }
 
 model Comment {
@@ -137,6 +143,34 @@ model CommentVote {
   type      VoteType
 
   @@id([userId, commentId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "COMMENT_REPLY"
+  fromUserId  String
+  postId      String?
+  commentId   String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromUser    User     @relation("NotificationFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model Bookmark {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
 }
 
 model NewsletterSubscriber {

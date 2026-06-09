@@ -15,7 +15,6 @@ export async function PATCH(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    // if no existing vote, create a new vote
     await db.comment.create({
       data: {
         text,
@@ -24,6 +23,29 @@ export async function PATCH(req: Request) {
         replyToId,
       },
     })
+
+    // Create notification for the parent comment author (if replying)
+    if (replyToId) {
+      const parentComment = await db.comment.findFirst({
+        where: { id: replyToId },
+        select: { authorId: true, postId: true },
+      })
+      if (parentComment && parentComment.authorId !== session.user.id) {
+        try {
+          await db.notification.create({
+            data: {
+              userId: parentComment.authorId,
+              type: 'COMMENT_REPLY',
+              fromUserId: session.user.id,
+              postId: parentComment.postId,
+              commentId: replyToId,
+            },
+          })
+        } catch {
+          // Don't fail the comment if notification creation fails
+        }
+      }
+    }
 
     return new Response('OK')
   } catch (error) {

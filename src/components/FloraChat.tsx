@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Flower2, Send, X, Minimize2, Maximize2, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FLORA_WELCOME_MESSAGE } from '@/lib/flora'
+import { useDict } from '@/components/I18nProvider'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ function ChatBubble({ msg }: { msg: Message }) {
             ? 'bg-zinc-200 text-zinc-600'
             : 'bg-gradient-to-br from-rose-400 to-pink-500 text-white'
         )}>
-        {isUser ? '我' : <Flower2 className='h-3.5 w-3.5' />}
+        {isUser ? dict.flora.me : <Flower2 className='h-3.5 w-3.5' />}
       </div>
 
       {/* Bubble */}
@@ -47,7 +47,7 @@ function ChatBubble({ msg }: { msg: Message }) {
         {msg.sources && msg.sources.length > 0 && (
           <div className='mt-3 pt-2.5 border-t border-rose-200/50'>
             <p className='text-[10px] text-rose-400 font-medium mb-2 uppercase tracking-wide'>
-              参考文章
+              {dict.flora.sources}
             </p>
             {msg.sources.slice(0, 2).map((s) => (
               <a
@@ -60,7 +60,7 @@ function ChatBubble({ msg }: { msg: Message }) {
                   {s.title}
                 </p>
                 <span className='text-[10px] text-rose-400 group-hover:text-rose-500'>
-                  阅读原文 →
+                  {dict.flora.readMore}
                 </span>
               </a>
             ))}
@@ -74,13 +74,14 @@ function ChatBubble({ msg }: { msg: Message }) {
 // ── Main Component ─────────────────────────────────────────
 
 export function FloraChat() {
+  const dict = useDict()
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: 'welcome',
       role: 'flora',
-      content: FLORA_WELCOME_MESSAGE,
+      content: dict.flora.welcomeMessage,
       timestamp: Date.now(),
     },
   ])
@@ -137,7 +138,7 @@ export function FloraChat() {
       const floraMsg: Message = {
         id: 'f-' + Date.now(),
         role: 'flora',
-        content: data.reply || '抱歉，我暂时无法回复 😢',
+        content: data.reply || dict.flora.errorReply,
         timestamp: Date.now(),
         sources: data.sources,
       }
@@ -149,7 +150,7 @@ export function FloraChat() {
         {
           id: 'f-' + Date.now(),
           role: 'flora',
-          content: '网络连接出问题了...请稍后再试 🌸',
+          content: dict.flora.networkError,
           timestamp: Date.now(),
         },
       ])
@@ -171,7 +172,7 @@ export function FloraChat() {
       <button
         onClick={() => setIsOpen(true)}
         className='fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-200 hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center group'
-        title='和 Flora 学姐聊天'>
+        title={dict.flora.title}>
         <Flower2 className='h-6 w-6 group-hover:animate-bounce' />
         {/* Unread dot */}
         <span className='absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white animate-pulse' />
@@ -193,9 +194,9 @@ export function FloraChat() {
             <Flower2 className='h-4 w-4' />
           </div>
           <div>
-            <p className='text-sm font-semibold leading-tight'>Flora 学姐</p>
+            <p className='text-sm font-semibold leading-tight'>{dict.flora.name}</p>
             <p className='text-[10px] text-white/70 leading-tight'>
-              {isLoading ? '正在输入...' : '在线 🌸'}
+              {isLoading ? dict.flora.typing : dict.flora.online}
             </p>
           </div>
         </div>
@@ -204,7 +205,7 @@ export function FloraChat() {
           <button
             onClick={() => setIsMinimized(!isMinimized)}
             className='p-1.5 rounded-lg hover:bg-white/20 transition-colors'
-            title={isMinimized ? '展开' : '收起'}>
+            title={isMinimized ? dict.flora.expand : dict.flora.collapse}>
             {isMinimized ? (
               <Maximize2 className='h-3.5 w-3.5' />
             ) : (
@@ -214,7 +215,7 @@ export function FloraChat() {
           <button
             onClick={() => setIsOpen(false)}
             className='p-1.5 rounded-lg hover:bg-white/20 transition-colors'
-            title='关闭'>
+            title={dict.flora.close}>
             <X className='h-3.5 w-3.5' />
           </button>
         </div>
@@ -255,7 +256,7 @@ export function FloraChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder='输入你的问题...'
+                placeholder={dict.flora.placeholder}
                 rows={1}
                 disabled={isLoading}
                 className='flex-1 resize-none rounded-xl border border-zinc-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 focus:border-rose-300 disabled:opacity-50 placeholder:text-zinc-400'
@@ -272,7 +273,7 @@ export function FloraChat() {
               </button>
             </div>
             <p className='text-[10px] text-zinc-400 mt-1.5 text-center'>
-              Flora 学姐 · AI 辅助回答 · 仅供参考
+              {dict.flora.footer}
             </p>
           </div>
         </>

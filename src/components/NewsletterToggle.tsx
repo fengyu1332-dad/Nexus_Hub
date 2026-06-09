@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/hooks/use-toast'
 import axios from 'axios'
+import { useDict } from '@/components/I18nProvider'
 
 interface NewsletterToggleProps {
   email: string
@@ -13,6 +14,7 @@ interface NewsletterToggleProps {
 export function NewsletterToggle({ email, initialSubscribed }: NewsletterToggleProps) {
   const [subscribed, setSubscribed] = useState(initialSubscribed)
   const [loading, setLoading] = useState(false)
+  const dict = useDict()
 
   const toggle = async () => {
     setLoading(true)
@@ -20,16 +22,16 @@ export function NewsletterToggle({ email, initialSubscribed }: NewsletterToggleP
       if (subscribed) {
         await axios.delete('/api/newsletter/subscribe', { data: { email } })
         setSubscribed(false)
-        toast({ description: '已退订周报邮件' })
+        toast({ description: dict.newsletter.unsubscribeSuccess })
       } else {
         await axios.post('/api/newsletter/subscribe', { email })
         setSubscribed(true)
-        toast({ description: '已订阅周报邮件，每周日早上见' })
+        toast({ description: dict.newsletter.subscribeSuccess })
       }
     } catch {
       toast({
-        title: '操作失败',
-        description: '请稍后重试',
+        title: dict.newsletter.operationFailed,
+        description: dict.newsletter.retryLater,
         variant: 'destructive',
       })
     } finally {
@@ -40,16 +42,16 @@ export function NewsletterToggle({ email, initialSubscribed }: NewsletterToggleP
   return (
     <div className='rounded-lg border bg-card text-card-foreground shadow-sm'>
       <div className='p-6 space-y-1'>
-        <h3 className='text-2xl font-semibold leading-none tracking-tight'>Newsletter</h3>
+        <h3 className='text-2xl font-semibold leading-none tracking-tight'>{dict.newsletter.heading}</h3>
         <p className='text-sm text-muted-foreground'>
-          每周日早上接收由 AI Architect 汇编的学术周报
+          {dict.newsletter.description}
         </p>
       </div>
       <div className='p-6 pt-0'>
         <div className='flex items-center justify-between'>
           <div>
             <p className='text-sm font-medium'>
-              {subscribed ? '已订阅' : '未订阅'}
+              {subscribed ? dict.newsletter.subscribed : dict.newsletter.unsubscribed}
             </p>
             <p className='text-xs text-zinc-500 mt-0.5'>
               {email}
@@ -60,7 +62,7 @@ export function NewsletterToggle({ email, initialSubscribed }: NewsletterToggleP
             isLoading={loading}
             onClick={toggle}
           >
-            {subscribed ? '退订' : '订阅'}
+            {subscribed ? dict.newsletter.unsubscribeAction : dict.newsletter.subscribeAction}
           </Button>
         </div>
       </div>

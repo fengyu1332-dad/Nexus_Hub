@@ -9,11 +9,13 @@ import { useMutation } from '@tanstack/react-query'
 import axios, { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { useDict } from '@/components/I18nProvider'
 
 const Page = () => {
   const router = useRouter()
   const [input, setInput] = useState<string>('')
   const { loginToast } = useCustomToasts()
+  const dict = useDict()
 
   const { mutate: createCommunity, isLoading } = useMutation({
     mutationFn: async () => {
@@ -28,16 +30,16 @@ const Page = () => {
       if (err instanceof AxiosError) {
         if (err.response?.status === 409) {
           return toast({
-            title: 'Subreddit already exists.',
-            description: 'Please choose a different name.',
+            title: dict.toast.subredditExists,
+            description: dict.toast.chooseDifferentName,
             variant: 'destructive',
           })
         }
 
         if (err.response?.status === 422) {
           return toast({
-            title: 'Invalid subreddit name.',
-            description: 'Please choose a name between 3 and 21 letters.',
+            title: dict.toast.invalidSubredditName,
+            description: dict.toast.chooseValidName,
             variant: 'destructive',
           })
         }
@@ -48,8 +50,8 @@ const Page = () => {
       }
 
       toast({
-        title: 'There was an error.',
-        description: 'Could not create subreddit.',
+        title: dict.toast.thereWasAnError,
+        description: dict.toast.couldNotCreateSubreddit,
         variant: 'destructive',
       })
     },
@@ -62,15 +64,15 @@ const Page = () => {
     <div className='container flex items-center h-full max-w-3xl mx-auto'>
       <div className='relative bg-white w-full h-fit p-4 rounded-lg space-y-6'>
         <div className='flex justify-between items-center'>
-          <h1 className='text-xl font-semibold'>Create a Community</h1>
+          <h1 className='text-xl font-semibold'>{dict.community.createCommunity}</h1>
         </div>
 
         <hr className='bg-red-500 h-px' />
 
         <div>
-          <p className='text-lg font-medium'>Name</p>
+          <p className='text-lg font-medium'>{dict.community.name}</p>
           <p className='text-xs pb-2'>
-            Community names including capitalization cannot be changed.
+            {dict.community.nameHelpText}
           </p>
           <div className='relative'>
             <p className='absolute text-sm left-0 w-8 inset-y-0 grid place-items-center text-zinc-400'>
@@ -89,13 +91,13 @@ const Page = () => {
             disabled={isLoading}
             variant='subtle'
             onClick={() => router.back()}>
-            Cancel
+            {dict.community.cancel}
           </Button>
           <Button
             isLoading={isLoading}
             disabled={input.length === 0}
             onClick={() => createCommunity()}>
-            Create Community
+            {dict.community.createCommunity}
           </Button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import SignUp from '@/components/SignUp'
 import { buttonVariants } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
+import { getDictionary } from '@/i18n'
 import { ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { FC } from 'react'
@@ -8,6 +9,8 @@ import { FC } from 'react'
 interface pageProps {}
 
 const page: FC<pageProps> = ({}) => {
+  const dict = getDictionary()
+
   return (
     <div className='absolute inset-0'>
       <div className='h-full max-w-2xl mx-auto flex flex-col items-center justify-center gap-20'>
@@ -18,7 +21,7 @@ const page: FC<pageProps> = ({}) => {
             'self-start -mt-20'
           )}>
           <ChevronLeft className='mr-2 h-4 w-4' />
-          Home
+          {dict.auth.home}
         </Link>
 
         <SignUp />

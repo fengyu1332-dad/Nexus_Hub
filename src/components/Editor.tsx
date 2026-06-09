@@ -13,6 +13,7 @@ import { uploadFiles } from '@/lib/uploadthing'
 import { PostCreationRequest, PostValidator } from '@/lib/validators/post'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
+import { useDict } from '@/components/I18nProvider'
 
 import '@/styles/editor.css'
 
@@ -23,6 +24,7 @@ interface EditorProps {
 }
 
 export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
+  const dict = useDict()
   const {
     register,
     handleSubmit,
@@ -53,8 +55,8 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
     },
     onError: () => {
       return toast({
-        title: 'Something went wrong.',
-        description: 'Your post was not published. Please try again.',
+        title: dict.toast.somethingWentWrong,
+        description: dict.toast.postNotPublished,
         variant: 'destructive',
       })
     },
@@ -66,7 +68,7 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
       router.refresh()
 
       return toast({
-        description: 'Your post has been published.',
+        description: dict.toast.postPublished,
       })
     },
   })
@@ -88,7 +90,7 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
         onReady() {
           ref.current = editor
         },
-        placeholder: 'Type here to write your post...',
+        placeholder: dict.editor.placeholder,
         inlineToolbar: true,
         data: { blocks: [] },
         tools: {
@@ -132,7 +134,7 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
       for (const [_key, value] of Object.entries(errors)) {
         value
         toast({
-          title: 'Something went wrong.',
+          title: dict.toast.somethingWentWrong,
           description: (value as { message: string }).message,
           variant: 'destructive',
         })
@@ -197,12 +199,12 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
               _titleRef.current = e
             }}
             {...rest}
-            placeholder='Title'
+            placeholder={dict.editor.titlePlaceholder}
             className='w-full resize-none appearance-none overflow-hidden bg-transparent text-5xl font-bold focus:outline-none'
           />
           <div id='editor' className='min-h-[500px]' />
           <p className='text-sm text-gray-500'>
-            Use{' '}
+            {dict.editor.tabHelp}{' '}
             <kbd className='rounded-md border bg-muted px-1 text-xs uppercase'>
               Tab
             </kbd>{' '}

@@ -1,13 +1,17 @@
 import { ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { formatDistanceToNowStrict } from 'date-fns'
-import locale from 'date-fns/locale/en-US'
+import enLocale from 'date-fns/locale/en-US'
+import zhLocale from 'date-fns/locale/zh-CN'
+import type { Locale } from '@/i18n/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const formatDistanceLocale = {
+type FormatDistanceToken = keyof typeof formatDistanceLocaleEn
+
+const formatDistanceLocaleEn = {
   lessThanXSeconds: 'just now',
   xSeconds: 'just now',
   halfAMinute: 'just now',
@@ -18,39 +22,69 @@ const formatDistanceLocale = {
   xDays: '{{count}}d',
   aboutXWeeks: '{{count}}w',
   xWeeks: '{{count}}w',
-  aboutXMonths: '{{count}}m',
-  xMonths: '{{count}}m',
+  aboutXMonths: '{{count}}mo',
+  xMonths: '{{count}}mo',
   aboutXYears: '{{count}}y',
   xYears: '{{count}}y',
   overXYears: '{{count}}y',
   almostXYears: '{{count}}y',
 }
 
-function formatDistance(token: string, count: number, options?: any): string {
-  options = options || {}
+const formatDistanceLocaleZh = {
+  lessThanXSeconds: '刚刚',
+  xSeconds: '刚刚',
+  halfAMinute: '刚刚',
+  lessThanXMinutes: '{{count}}分钟',
+  xMinutes: '{{count}}分钟',
+  aboutXHours: '{{count}}小时',
+  xHours: '{{count}}小时',
+  xDays: '{{count}}天',
+  aboutXWeeks: '{{count}}周',
+  xWeeks: '{{count}}周',
+  aboutXMonths: '{{count}}个月',
+  xMonths: '{{count}}个月',
+  aboutXYears: '{{count}}年',
+  xYears: '{{count}}年',
+  overXYears: '{{count}}年',
+  almostXYears: '{{count}}年',
+}
 
-  const result = formatDistanceLocale[
-    token as keyof typeof formatDistanceLocale
-  ].replace('{{count}}', count.toString())
+function formatDistanceEn(token: FormatDistanceToken, count: number, options?: any): string {
+  return formatDistanceImpl(formatDistanceLocaleEn, token, count, options)
+}
 
-  if (options.addSuffix) {
+function formatDistanceZh(token: FormatDistanceToken, count: number, options?: any): string {
+  return formatDistanceImpl(formatDistanceLocaleZh, token, count, options, true)
+}
+
+function formatDistanceImpl(
+  localeMap: Record<string, string>,
+  token: FormatDistanceToken,
+  count: number,
+  options?: any,
+  isZh: boolean = false
+): string {
+  const result = localeMap[token].replace('{{count}}', count.toString())
+
+  if (options?.addSuffix) {
     if (options.comparison > 0) {
-      return 'in ' + result
+      return isZh ? `${result}后` : 'in ' + result
     } else {
-      if (result === 'just now') return result
-      return result + ' ago'
+      if (result === '刚刚' || result === 'just now') return result
+      return isZh ? result + '前' : result + ' ago'
     }
   }
 
   return result
 }
 
-export function formatTimeToNow(date: Date): string {
+export function formatTimeToNow(date: Date, locale: Locale = 'en'): string {
+  const isZh = locale === 'zh-CN'
   return formatDistanceToNowStrict(date, {
     addSuffix: true,
     locale: {
-      ...locale,
-      formatDistance,
+      ...(isZh ? zhLocale : enLocale),
+      formatDistance: isZh ? formatDistanceZh : formatDistanceEn,
     },
   })
 }

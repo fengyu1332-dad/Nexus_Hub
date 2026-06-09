@@ -7,6 +7,19 @@ import { z } from 'zod'
 
 const CACHE_AFTER_UPVOTES = 1
 
+function computeHotScore(votesAmt: number, createdAt: Date): number {
+  return Math.log10(Math.max(Math.abs(votesAmt), 1))
+    + (createdAt.getTime() / 1000 - 1134028003) / 45000
+}
+
+async function updatePostScore(postId: string, votesAmt: number, createdAt: Date) {
+  const hotScore = computeHotScore(votesAmt, createdAt)
+  await db.post.update({
+    where: { id: postId },
+    data: { voteCount: votesAmt, hotScore },
+  })
+}
+
 export async function PATCH(req: Request) {
   try {
     const body = await req.json()
@@ -71,8 +84,10 @@ export async function PATCH(req: Request) {
             isAIGenerated: post.author.isAI,
           }
 
-          await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash
+          await redis.hset(`post:${postId}`, cachePayload)
         }
+
+        await updatePostScore(postId, votesAmt, post.createdAt)
 
         return new Response('OK')
       }
@@ -108,8 +123,10 @@ export async function PATCH(req: Request) {
           isAIGenerated: post.author.isAI,
         }
 
-        await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash
+        await redis.hset(`post:${postId}`, cachePayload)
       }
+
+      await updatePostScore(postId, votesAmt, post.createdAt)
 
       return new Response('OK')
     }
@@ -141,8 +158,10 @@ export async function PATCH(req: Request) {
         isAIGenerated: post.author.isAI,
       }
 
-      await redis.hset(`post:${postId}`, cachePayload) // Store the post data as a hash
+      await redis.hset(`post:${postId}`, cachePayload)
     }
+
+    await updatePostScore(postId, votesAmt, post.createdAt)
 
     return new Response('OK')
   } catch (error) {

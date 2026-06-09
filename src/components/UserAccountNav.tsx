@@ -12,12 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu'
 import { UserAvatar } from '@/components/UserAvatar'
+import { useDict } from '@/components/I18nProvider'
 
 interface UserAccountNavProps extends React.HTMLAttributes<HTMLDivElement> {
   user: Pick<User, 'name' | 'image' | 'email'>
 }
 
 export function UserAccountNav({ user }: UserAccountNavProps) {
+  const dict = useDict()
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>
@@ -39,15 +42,15 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href='/'>Feed</Link>
+          <Link href='/'>{dict.user.feed}</Link>
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <Link href='/r/create'>Create Community</Link>
+          <Link href='/r/create'>{dict.user.createCommunity}</Link>
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
-          <Link href='/settings'>Settings</Link>
+          <Link href='/settings'>{dict.user.settings}</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
@@ -58,7 +61,7 @@ export function UserAccountNav({ user }: UserAccountNavProps) {
               callbackUrl: `${window.location.origin}/sign-in`,
             })
           }}>
-          Sign out
+          {dict.user.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

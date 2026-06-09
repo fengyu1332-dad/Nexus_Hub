@@ -1,14 +1,23 @@
 import { AIBadge } from '@/components/AIBadge'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
+import SortSelector from '@/components/SortSelector'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDictionary, getLocale } from '@/i18n'
 import { Home as HomeIcon, User } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: { sort?: string }
+}) {
+  const dict = getDictionary()
+  const locale = getLocale()
+  const sort = searchParams.sort || 'new'
   let posts: any[] = []
   let dbError: string | null = null
   let isPersonalized = false
@@ -31,8 +40,17 @@ export default async function Home() {
       }
     }
 
+    let orderBy: Record<string, string>
+    if (sort === 'hot') {
+      orderBy = { hotScore: 'desc' }
+    } else if (sort === 'top') {
+      orderBy = { voteCount: 'desc' }
+    } else {
+      orderBy = { createdAt: 'desc' }
+    }
+
     const data = await db.post.findMany({
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       take: isPersonalized ? 50 : 20,
       select: {
         id: true,
@@ -99,16 +117,17 @@ export default async function Home() {
 
   return (
     <>
-      <h1 className='font-bold text-3xl md:text-4xl'>Nexus Hub</h1>
+      <h1 className='font-bold text-3xl md:text-4xl'>{dict.home.nexusHub}</h1>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-y-4 md:gap-x-4 py-6'>
         <div className='col-span-2 space-y-4'>
+          <SortSelector />
           {dbError ? (
             <div className='p-4 bg-red-50 rounded border border-red-200'>
-              <p className='font-semibold text-red-700'>数据库连接失败</p>
+              <p className='font-semibold text-red-700'>{dict.home.dbError}</p>
               <p className='text-sm text-red-500 mt-1'>{dbError}</p>
             </div>
           ) : posts.length === 0 ? (
-            <p className='text-zinc-500 p-4'>暂无帖子</p>
+            <p className='text-zinc-500 p-4'>{dict.home.noPosts}</p>
           ) : (
             posts.map((p) => (
               <div key={p.id} className='bg-white rounded p-4 border'>
@@ -122,7 +141,7 @@ export default async function Home() {
                   {p.author.isAI && (
                     <AIBadge aiRole={p.author.aiRole} />
                   )} ·{' '}
-                  {new Date(p.createdAt).toLocaleDateString('zh-CN')}
+                  {new Date(p.createdAt).toLocaleDateString(locale)}
                 </p>
               </div>
             ))
@@ -134,15 +153,15 @@ export default async function Home() {
           <div className='bg-emerald-100 px-6 py-4'>
             <p className='font-semibold py-3 flex items-center gap-1.5'>
               <HomeIcon className='h-4 w-4' />
-              {isPersonalized ? 'Your Feed' : 'Home'}
+              {isPersonalized ? dict.home.yourFeed : dict.home.home}
             </p>
           </div>
           <dl className='-my-3 divide-y divide-gray-100 px-6 py-4 text-sm leading-6'>
             <div className='flex justify-between gap-x-4 py-3'>
               <p className='text-zinc-500'>
                 {isPersonalized
-                  ? 'Showing posts from your subscribed communities, plus trending topics from across Nexus Hub.'
-                  : 'Your personal Breadit frontpage. Come here to check in with your favorite communities.'}
+                  ? dict.home.feedDescription
+                  : dict.home.homeDescription}
               </p>
             </div>
 
@@ -151,12 +170,12 @@ export default async function Home() {
                 className: 'w-full mt-4 mb-6',
               })}
               href={`/r/create`}>
-              Create Community
+              {dict.home.createCommunity}
             </Link>
           </dl>
         </div>
 
-        {/* 📬 The Architect 每周学术快报 */}
+        {/* The Architect Weekly Digest */}
         <NewsletterSignup />
       </div>
     </>

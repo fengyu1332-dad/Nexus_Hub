@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import PostFeed from '../PostFeed'
 import { notFound } from 'next/navigation'
 
-const CustomFeed = async () => {
+const CustomFeed = async ({ sort }: { sort?: string }) => {
   const session = await getAuthSession()
 
   // only rendered if session exists, so this will not happen
@@ -19,6 +19,15 @@ const CustomFeed = async () => {
     },
   })
 
+  let orderBy: Record<string, string>
+  if (sort === 'hot') {
+    orderBy = { hotScore: 'desc' }
+  } else if (sort === 'top') {
+    orderBy = { voteCount: 'desc' }
+  } else {
+    orderBy = { createdAt: 'desc' }
+  }
+
   const posts = await db.post.findMany({
     where: {
       subreddit: {
@@ -27,9 +36,7 @@ const CustomFeed = async () => {
         },
       },
     },
-    orderBy: {
-      createdAt: 'desc',
-    },
+    orderBy,
     include: {
       votes: true,
       author: true,
@@ -39,7 +46,19 @@ const CustomFeed = async () => {
     take: INFINITE_SCROLL_PAGINATION_RESULTS,
   })
 
-  return <PostFeed initialPosts={posts} />
+  // Fetch bookmarks for current user
+  let savedPostIds: Set<string> | undefined
+  try {
+    const bookmarks = await db.bookmark.findMany({
+      where: { userId: session.user.id },
+      select: { postId: true },
+    })
+    savedPostIds = new Set(bookmarks.map((b: any) => b.postId))
+  } catch {
+    // Bookmark table may not exist yet
+  }
+
+  return <PostFeed initialPosts={posts} sort={sort} savedPostIds={savedPostIds} />
 }
 
 export default CustomFeed

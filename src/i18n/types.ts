@@ -1,0 +1,215 @@
+export type Locale = 'zh-CN' | 'en'
+
+export interface Dictionary {
+  metadata: {
+    siteName: string
+    titleSuffix: string
+    tagline: string
+    description: string
+    postNotFound: string
+    communityNotFound: string
+    userNotFound: string
+  }
+  navbar: {
+    logoText: string
+    signIn: string
+    languageLabel: string
+  }
+  search: {
+    placeholder: string
+    noResults: string
+    communities: string
+    posts: string
+    searchTitle: string
+    enterSearchTerm: string
+    resultsFor: string
+    noPostsFound: string
+    tryDifferentKeyword: string
+    subscribers: string
+  }
+  auth: {
+    welcomeBack: string
+    signUp: string
+    signIn: string
+    termsConsent: string
+    newToSite: string
+    alreadyMember: string
+    home: string
+    google: string
+  }
+  user: {
+    feed: string
+    createCommunity: string
+    settings: string
+    signOut: string
+    yourComment: string
+    whatAreYourThoughts: string
+    post: string
+    reply: string
+    cancel: string
+    postedBy: string
+    comments: string
+    createPost: string
+    leaveCommunity: string
+    joinToPost: string
+    backHome: string
+    backToCommunity: string
+    aiAgent: string
+    communityMember: string
+    noPostsYet: string
+    noCommentsYet: string
+    recentComments: string
+    posts: string
+    onPost: string
+    unknownPost: string
+    notAvailable: string
+    notSet: string
+    profile: string
+    account: string
+    accountDetails: string
+    email: string
+    username: string
+    changeName: string
+    yourUsername: string
+    usernameDescription: string
+    name: string
+    aiRole_Newton: string
+    aiRole_Midas: string
+    aiRole_Flora: string
+    aiRole_default: string
+  }
+  community: {
+    createCommunity: string
+    name: string
+    nameHelpText: string
+    about: string
+    created: string
+    members: string
+    youCreated: string
+    createPost: string
+    cancel: string
+    inCommunity: string
+  }
+  settings: {
+    settings: string
+    manageDescription: string
+  }
+  newsletter: {
+    heading: string
+    description: string
+    placeholder: string
+    subscribe: string
+    footer: string
+    networkError: string
+    subscribed: string
+    unsubscribed: string
+    subscribeAction: string
+    unsubscribeAction: string
+    subscribeSuccess: string
+    unsubscribeSuccess: string
+    operationFailed: string
+    retryLater: string
+    signupHeading: string
+    signupDescription: string
+  }
+  editor: {
+    placeholder: string
+    titlePlaceholder: string
+    tabHelp: string
+    noContent: string
+    errorTitle: string
+    postNotPublished: string
+    postPublished: string
+  }
+  flora: {
+    title: string
+    me: string
+    name: string
+    typing: string
+    online: string
+    expand: string
+    collapse: string
+    close: string
+    placeholder: string
+    footer: string
+    errorReply: string
+    networkError: string
+    sources: string
+    readMore: string
+    welcomeMessage: string
+  }
+  toast: {
+    error: string
+    loginRequired: string
+    needLoginDescription: string
+    login: string
+    somethingWentWrong: string
+    pleaseTryAgain: string
+    commentNotCreated: string
+    voteNotRegistered: string
+    postNotPublished: string
+    postPublished: string
+    subscribed: string
+    unsubscribed: string
+    subscribedTo: string
+    unsubscribedFrom: string
+    thereWasAProblem: string
+    usernameTaken: string
+    chooseAnotherUsername: string
+    usernameNotUpdated: string
+    usernameUpdated: string
+    googleLoginError: string
+    invalidSubredditName: string
+    chooseValidName: string
+    subredditExists: string
+    chooseDifferentName: string
+    couldNotCreateSubreddit: string
+    thereWasAnError: string
+  }
+  errorPage: {
+    heading: string
+    retry: string
+    fallbackMessage: string
+  }
+  home: {
+    dbError: string
+    noPosts: string
+    nexusHub: string
+    yourFeed: string
+    home: string
+    feedDescription: string
+    homeDescription: string
+    createCommunity: string
+  }
+  relativeTime: {
+    justNow: string
+    minutes: string
+    hours: string
+    days: string
+    weeks: string
+    months: string
+    years: string
+    in: string
+    ago: string
+  }
+  relatedPosts: {
+    heading: string
+  }
+  sort: {
+    new: string
+    hot: string
+    top: string
+  }
+  notifications: {
+    title: string
+    empty: string
+    markAllRead: string
+    commentReply: string
+  }
+  bookmark: {
+    save: string
+    unsave: string
+    savedPosts: string
+    noSavedPosts: string
+  }
+}

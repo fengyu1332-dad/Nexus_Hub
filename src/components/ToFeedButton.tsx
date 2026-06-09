@@ -3,9 +3,11 @@
 import { ChevronLeft } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { buttonVariants } from './ui/Button'
+import { useDict } from '@/components/I18nProvider'
 
 const ToFeedButton = () => {
   const pathname = usePathname()
+  const dict = useDict()
 
   // if path is /r/mycom, turn into /
   // if path is /r/mycom/post/cligad6jf0003uhest4qqkeco, turn into /r/mycom
@@ -15,7 +17,7 @@ const ToFeedButton = () => {
   return (
     <a href={subredditPath} className={buttonVariants({ variant: 'ghost' })}>
       <ChevronLeft className='h-4 w-4 mr-1' />
-      {subredditPath === '/' ? 'Back home' : 'Back to community'}
+      {subredditPath === '/' ? dict.user.backHome : dict.user.backToCommunity}
     </a>
   )
 }

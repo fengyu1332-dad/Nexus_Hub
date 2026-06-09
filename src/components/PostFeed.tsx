@@ -13,9 +13,11 @@ import { useSession } from 'next-auth/react'
 interface PostFeedProps {
   initialPosts: ExtendedPost[]
   subredditName?: string
+  sort?: string
+  savedPostIds?: Set<string>
 }
 
-const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
+const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName, sort, savedPostIds }) => {
   const lastPostRef = useRef<HTMLElement>(null)
   const { ref, entry } = useIntersection({
     root: lastPostRef.current,
@@ -24,11 +26,12 @@ const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
   const { data: session } = useSession()
 
   const { data, fetchNextPage, isFetchingNextPage } = useInfiniteQuery(
-    ['infinite-query'],
+    ['infinite-query', subredditName, sort],
     async ({ pageParam = 1 }) => {
       const query =
         `/api/posts?limit=${INFINITE_SCROLL_PAGINATION_RESULTS}&page=${pageParam}` +
-        (!!subredditName ? `&subredditName=${subredditName}` : '')
+        (!!subredditName ? `&subredditName=${subredditName}` : '') +
+        (!!sort ? `&sort=${sort}` : '')
 
       const { data } = await axios.get(query)
       return data as ExtendedPost[]
@@ -64,7 +67,6 @@ const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
         )
 
         if (index === posts.length - 1) {
-          // Add a ref to the last post in the list
           return (
             <li key={post.id} ref={ref}>
               <Post
@@ -73,6 +75,7 @@ const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
                 subredditName={post.subreddit.name}
                 votesAmt={votesAmt}
                 currentVote={currentVote}
+                savedPostIds={savedPostIds}
               />
             </li>
           )
@@ -85,6 +88,7 @@ const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
               subredditName={post.subreddit.name}
               votesAmt={votesAmt}
               currentVote={currentVote}
+              savedPostIds={savedPostIds}
             />
           )
         }

@@ -4,7 +4,9 @@ import PostVoteServer from '@/components/post-vote/PostVoteServer'
 import { AIBadge } from '@/components/AIBadge'
 import { InlineMathProcessor } from '@/components/InlineMathProcessor'
 import { RelatedPosts } from '@/components/RelatedPosts'
+import BookmarkButton from '@/components/BookmarkButton'
 import { buttonVariants } from '@/components/ui/Button'
+import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { redis } from '@/lib/redis'
 import { formatTimeToNow } from '@/lib/utils'
@@ -14,9 +16,12 @@ import { ArrowBigDown, ArrowBigUp, Loader2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { getDictionary, getLocale } from '@/i18n'
+import type { Metadata } from 'next'
 
 interface SubRedditPostPageProps {
   params: {
+    slug: string
     postId: string
   }
 }
@@ -24,9 +29,10 @@ interface SubRedditPostPageProps {
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-// ── 动态 SEO Metadata ─────────────────────────────────────
+// ── Dynamic SEO Metadata ─────────────────────────────────────
 
-export async function generateMetadata({ params }: SubRedditPostPageProps) {
+export async function generateMetadata({ params }: SubRedditPostPageProps): Promise<Metadata> {
+  const dict = getDictionary()
   const post = await db.post.findFirst({
     where: { id: params.postId },
     select: {
@@ -37,7 +43,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps) {
     },
   })
 
-  if (!post) return { title: 'Post Not Found — Nexus Hub' }
+  if (!post) return { title: dict.metadata.postNotFound }
 
   // Resolve author and subreddit manually (compatible with Supabase REST)
   let authorLabel = 'Unknown'
@@ -49,7 +55,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps) {
     })
     if (author) {
       authorLabel = (author as any).isAI
-        ? `AI-${(author as any).aiRole || '生成'}`
+        ? `AI-${(author as any).aiRole || ''}`
         : `u/${(author as any).username}`
     }
     const sub = await db.subreddit.findFirst({
@@ -59,7 +65,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps) {
     if (sub) subName = (sub as any).name
   } catch { /* fallback */ }
 
-  // 从 EditorJS JSON 中提取纯文本描述
+  // Extract plain text description from EditorJS JSON
   let description = ''
   try {
     const content = (post as any).content
@@ -77,7 +83,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps) {
   }
 
   return {
-    title: `${(post as any).title} — r/${subName} | Nexus Hub`,
+    title: `${(post as any).title} — r/${subName} | ${dict.metadata.titleSuffix}`,
     description: `${authorLabel} · ${description}`,
     openGraph: {
       title: (post as any).title,
@@ -95,6 +101,8 @@ export async function generateMetadata({ params }: SubRedditPostPageProps) {
 }
 
 const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
+  const dict = getDictionary()
+  const locale = getLocale()
   // Redis 未配置时跳过缓存，直接用 DB 查询
   let cachedPost: CachedPost | null = null
   try {
@@ -121,6 +129,23 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
 
   if (!post && !cachedPost) return notFound()
 
+  // Check if current user has bookmarked this post
+  const session = await getAuthSession()
+  let isSaved = false
+  if (session?.user) {
+    try {
+      const bookmark = await db.bookmark.findFirst({
+        where: {
+          userId: session.user.id,
+          postId: params.postId,
+        },
+      })
+      isSaved = !!bookmark
+    } catch {
+      // Bookmark table may not exist yet
+    }
+  }
+
   return (
     <div>
       <div className='h-full flex flex-col sm:flex-row items-center sm:items-start justify-between'>
@@ -142,18 +167,21 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
         </Suspense>
 
         <div className='sm:w-0 w-full flex-1 bg-white p-4 rounded-sm'>
-          <p className='max-h-40 mt-1 truncate text-xs text-gray-500'>
-            Posted by{' '}
-            <Link
-              href={`/u/${post?.author.username ?? cachedPost?.authorUsername}`}
-              className='underline hover:text-orange-500'>
-              u/{post?.author.username ?? cachedPost?.authorUsername}
-            </Link>{' '}
-            {(post?.author.isAI || cachedPost?.isAIGenerated) && (
-              <AIBadge aiRole={post?.author.aiRole} />
-            )}
-            {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()))}
-          </p>
+          <div className='flex items-start justify-between'>
+            <p className='max-h-40 mt-1 truncate text-xs text-gray-500'>
+              {dict.user.postedBy}{' '}
+              <Link
+                href={`/u/${post?.author.username ?? cachedPost?.authorUsername}`}
+                className='underline hover:text-orange-500'>
+                u/{post?.author.username ?? cachedPost?.authorUsername}
+              </Link>{' '}
+              {(post?.author.isAI || cachedPost?.isAIGenerated) && (
+                <AIBadge aiRole={post?.author.aiRole} />
+              )}
+              {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
+            </p>
+            <BookmarkButton postId={params.postId} initialSaved={isSaved} />
+          </div>
           <h1 className='text-xl font-semibold py-2 leading-6 text-gray-900'>
             {post?.title ?? cachedPost?.title}
           </h1>

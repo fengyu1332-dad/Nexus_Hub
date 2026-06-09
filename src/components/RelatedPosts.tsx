@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { cosineSimilarity } from '@/lib/embedding'
+import { getDictionary } from '@/i18n'
 import Link from 'next/link'
 
 interface RelatedPostsProps {
@@ -30,6 +31,7 @@ export async function RelatedPosts({
   subredditName,
   embedding,
 }: RelatedPostsProps) {
+  const dict = getDictionary()
   let related: { id: string; title: string; excerpt: string }[] = []
 
   try {
@@ -94,7 +96,7 @@ export async function RelatedPosts({
 
   return (
     <div className='mt-8 pt-6 border-t border-gray-200'>
-      <h3 className='font-semibold text-lg mb-4'>Related Posts</h3>
+      <h3 className='font-semibold text-lg mb-4'>{dict.relatedPosts.heading}</h3>
       <div className='grid gap-3 sm:grid-cols-3'>
         {related.map((p) => (
           <Link

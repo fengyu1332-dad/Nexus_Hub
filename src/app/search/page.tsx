@@ -1,6 +1,8 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
 import { AIBadge } from '@/components/AIBadge'
+import { getDictionary, getLocale } from '@/i18n'
+import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,10 +21,11 @@ function extractTextFromContent(content: unknown): string {
   }
 }
 
-export async function generateMetadata({ searchParams }: { searchParams: { q?: string } }) {
+export async function generateMetadata({ searchParams }: { searchParams: { q?: string } }): Promise<Metadata> {
+  const dict = getDictionary()
   return {
-    title: searchParams.q ? `Search: ${searchParams.q} — Nexus Hub` : 'Search — Nexus Hub',
-    description: 'Search posts and communities on Nexus Hub',
+    title: searchParams.q ? `${dict.search.searchTitle}: ${searchParams.q} — ${dict.metadata.titleSuffix}` : `${dict.search.searchTitle} — ${dict.metadata.titleSuffix}`,
+    description: dict.metadata.description,
   }
 }
 
@@ -31,14 +34,16 @@ export default async function SearchPage({
 }: {
   searchParams: { q?: string }
 }) {
+  const dict = getDictionary()
+  const locale = getLocale()
   const q = searchParams.q || ''
   const keyword = q.toLowerCase()
 
   if (!q) {
     return (
       <div className='max-w-4xl mx-auto py-12'>
-        <h1 className='font-bold text-3xl md:text-4xl mb-4'>Search</h1>
-        <p className='text-zinc-500'>Enter a search term to find posts and communities.</p>
+        <h1 className='font-bold text-3xl md:text-4xl mb-4'>{dict.search.searchTitle}</h1>
+        <p className='text-zinc-500'>{dict.search.enterSearchTerm}</p>
       </div>
     )
   }
@@ -109,16 +114,16 @@ export default async function SearchPage({
 
   return (
     <div className='max-w-4xl mx-auto py-12'>
-      <h1 className='font-bold text-3xl md:text-4xl mb-2'>Search</h1>
+      <h1 className='font-bold text-3xl md:text-4xl mb-2'>{dict.search.searchTitle}</h1>
       <p className='text-zinc-500 mb-8'>
-        Results for &quot;<span className='font-medium text-zinc-800'>{q}</span>&quot;
-        — {postResults.length} posts, {communities.length} communities
+        {dict.search.resultsFor} &quot;<span className='font-medium text-zinc-800'>{q}</span>&quot;
+        — {postResults.length} {dict.search.posts}, {communities.length} {dict.search.communities}
       </p>
 
       {/* Communities */}
       {communities.length > 0 && (
         <section className='mb-10'>
-          <h2 className='font-semibold text-lg mb-4'>Communities</h2>
+          <h2 className='font-semibold text-lg mb-4'>{dict.search.communities}</h2>
           <div className='space-y-2'>
             {communities.map((c: any) => (
               <Link
@@ -129,7 +134,7 @@ export default async function SearchPage({
                 <span className='font-medium'>r/{c.name}</span>
                 {c._count?.subscribers !== undefined && (
                   <span className='text-xs text-zinc-400 ml-2'>
-                    {c._count.subscribers} subscribers
+                    {c._count.subscribers} {dict.search.subscribers}
                   </span>
                 )}
               </Link>
@@ -140,11 +145,11 @@ export default async function SearchPage({
 
       {/* Posts */}
       <section>
-        <h2 className='font-semibold text-lg mb-4'>Posts</h2>
+        <h2 className='font-semibold text-lg mb-4'>{dict.search.posts}</h2>
         {postResults.length === 0 ? (
           <div className='bg-white rounded border p-8 text-center'>
-            <p className='text-zinc-500'>No posts found for &quot;{q}&quot;</p>
-            <p className='text-sm text-zinc-400 mt-1'>Try a different keyword</p>
+            <p className='text-zinc-500'>{dict.search.noPostsFound} &quot;{q}&quot;</p>
+            <p className='text-sm text-zinc-400 mt-1'>{dict.search.tryDifferentKeyword}</p>
           </div>
         ) : (
           <div className='space-y-4'>
@@ -162,7 +167,7 @@ export default async function SearchPage({
                 <p className='text-xs text-zinc-400 mt-2'>
                   r/{p.subredditName} · u/{p.author.username}
                   {p.author.isAI && <AIBadge aiRole={p.author.aiRole} />} ·{' '}
-                  {new Date(p.createdAt).toLocaleDateString('zh-CN')}
+                  {new Date(p.createdAt).toLocaleDateString(locale)}
                 </p>
               </div>
             ))}

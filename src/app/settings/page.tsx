@@ -4,13 +4,19 @@ import { UserNameForm } from '@/components/UserNameForm'
 import { NewsletterToggle } from '@/components/NewsletterToggle'
 import { authOptions, getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDictionary } from '@/i18n'
+import type { Metadata } from 'next'
 
-export const metadata = {
-  title: 'Settings',
-  description: 'Manage account and website settings.',
+export async function generateMetadata(): Promise<Metadata> {
+  const dict = getDictionary()
+  return {
+    title: dict.settings.settings,
+    description: dict.settings.manageDescription,
+  }
 }
 
 export default async function SettingsPage() {
+  const dict = getDictionary()
   const session = await getAuthSession()
 
   if (!session?.user) {
@@ -32,7 +38,7 @@ export default async function SettingsPage() {
   return (
     <div className='max-w-4xl mx-auto py-12'>
       <div className='grid items-start gap-8'>
-        <h1 className='font-bold text-3xl md:text-4xl'>Settings</h1>
+        <h1 className='font-bold text-3xl md:text-4xl'>{dict.settings.settings}</h1>
 
         <div className='grid gap-10'>
           <UserNameForm
@@ -45,22 +51,22 @@ export default async function SettingsPage() {
           {/* Account Info */}
           <div className='rounded-lg border bg-card text-card-foreground shadow-sm'>
             <div className='p-6 space-y-1'>
-              <h3 className='text-2xl font-semibold leading-none tracking-tight'>Account</h3>
-              <p className='text-sm text-muted-foreground'>Your account details</p>
+              <h3 className='text-2xl font-semibold leading-none tracking-tight'>{dict.user.account}</h3>
+              <p className='text-sm text-muted-foreground'>{dict.user.accountDetails}</p>
             </div>
             <div className='p-6 pt-0'>
               <div className='grid gap-4'>
                 <div>
                   <label className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
-                    Email
+                    {dict.user.email}
                   </label>
-                  <p className='mt-1.5 text-sm text-zinc-500'>{session.user.email || 'Not available'}</p>
+                  <p className='mt-1.5 text-sm text-zinc-500'>{session.user.email || dict.user.notAvailable}</p>
                 </div>
                 <div>
                   <label className='text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70'>
-                    Username
+                    {dict.user.username}
                   </label>
-                  <p className='mt-1.5 text-sm text-zinc-500'>u/{session.user.username || 'Not set'}</p>
+                  <p className='mt-1.5 text-sm text-zinc-500'>u/{session.user.username || dict.user.notSet}</p>
                 </div>
               </div>
             </div>

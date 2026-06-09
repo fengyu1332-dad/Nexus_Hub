@@ -18,6 +18,7 @@ import { Label } from '../ui/Label'
 import { Textarea } from '../ui/Textarea'
 import { toast } from '../../hooks/use-toast'
 import { useSession } from 'next-auth/react'
+import { useI18n } from '@/components/I18nProvider'
 
 type ExtendedComment = Comment & {
   votes: CommentVote[]
@@ -37,6 +38,7 @@ const PostComment: FC<PostCommentProps> = ({
   currentVote,
   postId,
 }) => {
+  const { dict, locale } = useI18n()
   const { data: session } = useSession()
   const [isReplying, setIsReplying] = useState<boolean>(false)
   const commentRef = useRef<HTMLDivElement>(null)
@@ -59,8 +61,8 @@ const PostComment: FC<PostCommentProps> = ({
 
     onError: () => {
       return toast({
-        title: 'Something went wrong.',
-        description: "Comment wasn't created successfully. Please try again.",
+        title: dict.toast.somethingWentWrong,
+        description: dict.toast.commentNotCreated,
         variant: 'destructive',
       })
     },
@@ -92,7 +94,7 @@ const PostComment: FC<PostCommentProps> = ({
           </p>
 
           <p className='max-h-40 truncate text-xs text-zinc-500'>
-            {formatTimeToNow(new Date(comment.createdAt))}
+            {formatTimeToNow(new Date(comment.createdAt), locale)}
           </p>
         </div>
       </div>
@@ -114,13 +116,13 @@ const PostComment: FC<PostCommentProps> = ({
           variant='ghost'
           size='xs'>
           <MessageSquare className='h-4 w-4 mr-1.5' />
-          Reply
+          {dict.user.reply}
         </Button>
       </div>
 
       {isReplying ? (
         <div className='grid w-full gap-1.5'>
-          <Label htmlFor='comment'>Your comment</Label>
+          <Label htmlFor='comment'>{dict.user.yourComment}</Label>
           <div className='mt-2'>
             <Textarea
               onFocus={(e) =>
@@ -134,7 +136,7 @@ const PostComment: FC<PostCommentProps> = ({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               rows={1}
-              placeholder='What are your thoughts?'
+              placeholder={dict.user.whatAreYourThoughts}
             />
 
             <div className='mt-2 flex justify-end gap-2'>
@@ -142,7 +144,7 @@ const PostComment: FC<PostCommentProps> = ({
                 tabIndex={-1}
                 variant='subtle'
                 onClick={() => setIsReplying(false)}>
-                Cancel
+                {dict.user.cancel}
               </Button>
               <Button
                 isLoading={isLoading}
@@ -154,7 +156,7 @@ const PostComment: FC<PostCommentProps> = ({
                     replyToId: comment.replyToId ?? comment.id, // default to top-level comment
                   })
                 }}>
-                Post
+                {dict.user.post}
               </Button>
             </div>
           </div>

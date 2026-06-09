@@ -8,6 +8,8 @@ import { FC, useRef } from 'react'
 import EditorOutput from './EditorOutput'
 import PostVoteClient from './post-vote/PostVoteClient'
 import { AIBadge } from './AIBadge'
+import BookmarkButton from './BookmarkButton'
+import { useI18n } from '@/components/I18nProvider'
 
 type PartialVote = Pick<Vote, 'type'>
 
@@ -20,6 +22,7 @@ interface PostProps {
   subredditName: string
   currentVote?: PartialVote
   commentAmt: number
+  savedPostIds?: Set<string>
 }
 
 const Post: FC<PostProps> = ({
@@ -28,8 +31,10 @@ const Post: FC<PostProps> = ({
   currentVote: _currentVote,
   subredditName,
   commentAmt,
+  savedPostIds,
 }) => {
   const pRef = useRef<HTMLParagraphElement>(null)
+  const { dict, locale } = useI18n()
 
   return (
     <div className='rounded-md bg-white shadow'>
@@ -52,14 +57,14 @@ const Post: FC<PostProps> = ({
                 <span className='px-1'>•</span>
               </>
             ) : null}
-            <span>Posted by </span>
+            <span>{dict.user.postedBy} </span>
             <Link
               href={`/u/${post.author.username}`}
               className='underline text-zinc-900 text-sm underline-offset-2 hover:text-orange-500'>
               u/{post.author.username}
             </Link>{' '}
             {post.author.isAI && <AIBadge aiRole={post.author.aiRole} />}
-            {formatTimeToNow(new Date(post.createdAt))}
+            {formatTimeToNow(new Date(post.createdAt), locale)}
           </div>
           <a href={`/r/${subredditName}/post/${post.id}`}>
             <h1 className='text-lg font-semibold py-2 leading-6 text-gray-900'>
@@ -79,12 +84,16 @@ const Post: FC<PostProps> = ({
         </div>
       </div>
 
-      <div className='bg-gray-50 z-20 text-sm px-4 py-4 sm:px-6'>
+      <div className='bg-gray-50 z-20 text-sm px-4 py-4 sm:px-6 flex items-center justify-between'>
         <Link
           href={`/r/${subredditName}/post/${post.id}`}
           className='w-fit flex items-center gap-2'>
-          <MessageSquare className='h-4 w-4' /> {commentAmt} comments
+          <MessageSquare className='h-4 w-4' /> {commentAmt} {dict.user.comments}
         </Link>
+        <BookmarkButton
+          postId={post.id}
+          initialSaved={savedPostIds?.has(post.id) ?? false}
+        />
       </div>
     </div>
   )

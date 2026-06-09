@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { startTransition } from 'react'
 import { useToast } from '../hooks/use-toast'
 import { useCustomToasts } from '@/hooks/use-custom-toasts'
+import { useDict } from '@/components/I18nProvider'
 
 interface SubscribeLeaveToggleProps {
   isSubscribed: boolean
@@ -22,6 +23,7 @@ const SubscribeLeaveToggle = ({
   const { toast } = useToast()
   const { loginToast } = useCustomToasts()
   const router = useRouter()
+  const dict = useDict()
 
   const { mutate: subscribe, isLoading: isSubLoading } = useMutation({
     mutationFn: async () => {
@@ -40,20 +42,18 @@ const SubscribeLeaveToggle = ({
       }
 
       return toast({
-        title: 'There was a problem.',
-        description: 'Something went wrong. Please try again.',
+        title: dict.toast.thereWasAProblem,
+        description: dict.toast.pleaseTryAgain,
         variant: 'destructive',
       })
     },
     onSuccess: () => {
       startTransition(() => {
-        // Refresh the current route and fetch new data from the server without
-        // losing client-side browser or React state.
         router.refresh()
       })
       toast({
-        title: 'Subscribed!',
-        description: `You are now subscribed to r/${subredditName}`,
+        title: dict.toast.subscribed,
+        description: `${dict.toast.subscribedTo} r/${subredditName}`,
       })
     },
   })
@@ -69,20 +69,18 @@ const SubscribeLeaveToggle = ({
     },
     onError: (err: AxiosError) => {
       toast({
-        title: 'Error',
+        title: dict.toast.error,
         description: err.response?.data as string,
         variant: 'destructive',
       })
     },
     onSuccess: () => {
       startTransition(() => {
-        // Refresh the current route and fetch new data from the server without
-        // losing client-side browser or React state.
         router.refresh()
       })
       toast({
-        title: 'Unsubscribed!',
-        description: `You are now unsubscribed from/${subredditName}`,
+        title: dict.toast.unsubscribed,
+        description: `${dict.toast.unsubscribedFrom} r/${subredditName}`,
       })
     },
   })
@@ -92,14 +90,14 @@ const SubscribeLeaveToggle = ({
       className='w-full mt-1 mb-4'
       isLoading={isUnsubLoading}
       onClick={() => unsubscribe()}>
-      Leave community
+      {dict.user.leaveCommunity}
     </Button>
   ) : (
     <Button
       className='w-full mt-1 mb-4'
       isLoading={isSubLoading}
       onClick={() => subscribe()}>
-      Join to post
+      {dict.user.joinToPost}
     </Button>
   )
 }

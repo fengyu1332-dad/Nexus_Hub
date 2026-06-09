@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { UsernameValidator } from '@/lib/validators/username'
 import { useMutation } from '@tanstack/react-query'
 import axios, { AxiosError } from 'axios'
+import { useDict } from '@/components/I18nProvider'
 
 interface UserNameFormProps extends React.HTMLAttributes<HTMLFormElement> {
   user: Pick<User, 'id' | 'username'>
@@ -32,6 +33,7 @@ type FormData = z.infer<typeof UsernameValidator>
 
 export function UserNameForm({ user, className, ...props }: UserNameFormProps) {
   const router = useRouter()
+  const dict = useDict()
   const {
     handleSubmit,
     register,
@@ -54,22 +56,22 @@ export function UserNameForm({ user, className, ...props }: UserNameFormProps) {
       if (err instanceof AxiosError) {
         if (err.response?.status === 409) {
           return toast({
-            title: 'Username already taken.',
-            description: 'Please choose another username.',
+            title: dict.toast.usernameTaken,
+            description: dict.toast.chooseAnotherUsername,
             variant: 'destructive',
           })
         }
       }
 
       return toast({
-        title: 'Something went wrong.',
-        description: 'Your username was not updated. Please try again.',
+        title: dict.toast.somethingWentWrong,
+        description: dict.toast.usernameNotUpdated,
         variant: 'destructive',
       })
     },
     onSuccess: () => {
       toast({
-        description: 'Your username has been updated.',
+        description: dict.toast.usernameUpdated,
       })
       router.refresh()
     },
@@ -82,9 +84,9 @@ export function UserNameForm({ user, className, ...props }: UserNameFormProps) {
       {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Your username</CardTitle>
+          <CardTitle>{dict.user.yourUsername}</CardTitle>
           <CardDescription>
-            Please enter a display name you are comfortable with.
+            {dict.user.usernameDescription}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -93,7 +95,7 @@ export function UserNameForm({ user, className, ...props }: UserNameFormProps) {
               <span className='text-sm text-zinc-400'>u/</span>
             </div>
             <Label className='sr-only' htmlFor='name'>
-              Name
+              {dict.user.name}
             </Label>
             <Input
               id='name'
@@ -107,7 +109,7 @@ export function UserNameForm({ user, className, ...props }: UserNameFormProps) {
           </div>
         </CardContent>
         <CardFooter>
-          <Button isLoading={isLoading}>Change name</Button>
+          <Button isLoading={isLoading}>{dict.user.changeName}</Button>
         </CardFooter>
       </Card>
     </form>

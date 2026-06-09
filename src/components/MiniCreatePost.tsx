@@ -7,6 +7,7 @@ import { FC } from 'react'
 import { UserAvatar } from './UserAvatar'
 import type { Session } from 'next-auth'
 import { usePathname, useRouter } from 'next/navigation'
+import { useDict } from '@/components/I18nProvider'
 
 interface MiniCreatePostProps {
   session: Session | null
@@ -15,6 +16,7 @@ interface MiniCreatePostProps {
 const MiniCreatePost: FC<MiniCreatePostProps> = ({ session }) => {
   const router = useRouter()
   const pathname = usePathname()
+  const dict = useDict()
 
   return (
     <li className='overflow-hidden rounded-md bg-white shadow'>
@@ -33,7 +35,7 @@ const MiniCreatePost: FC<MiniCreatePostProps> = ({ session }) => {
         <Input
           onClick={() => router.push(pathname + '/submit')}
           readOnly
-          placeholder='Create post'
+          placeholder={dict.user.createPost}
         />
         <Button
           onClick={() => router.push(pathname + '/submit')}
