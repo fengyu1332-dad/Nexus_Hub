@@ -23,7 +23,17 @@ export default async function AdminUsersPage() {
   return (
     <div className='space-y-8'>
       <h1 className='text-3xl font-bold text-zinc-900'>{dict.admin.users}</h1>
-      <AdminUsersTable initialUsers={(users || []) as any} initialTotal={total} initialPage={1} />
+      <AdminUsersTable
+        initialUsers={(users || []) as any}
+        initialTotal={total}
+        initialPage={1}
+        labels={{
+          searchUsers: dict.admin.searchUsers,
+          noUsers: dict.admin.noUsers,
+          makeAdmin: dict.admin.makeAdmin,
+          removeAdmin: dict.admin.removeAdmin,
+        }}
+      />
     </div>
   )
 }

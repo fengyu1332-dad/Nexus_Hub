@@ -1,6 +1,5 @@
 'use client'
 
-import { useDict } from '@/components/I18nProvider'
 import { Users, FileText, MessageSquare, Globe } from 'lucide-react'
 
 interface Stats {
@@ -10,14 +9,19 @@ interface Stats {
   totalCommunities: number
 }
 
-export function AdminStatsCards({ stats }: { stats: Stats }) {
-  const dict = useDict()
+interface Labels {
+  totalUsers: string
+  totalPosts: string
+  totalComments: string
+  totalCommunities: string
+}
 
+export function AdminStatsCards({ stats, labels }: { stats: Stats; labels: Labels }) {
   const cards = [
-    { label: dict.admin.totalUsers, value: stats.totalUsers, icon: Users, color: 'bg-blue-50 text-blue-700' },
-    { label: dict.admin.totalPosts, value: stats.totalPosts, icon: FileText, color: 'bg-emerald-50 text-emerald-700' },
-    { label: dict.admin.totalComments, value: stats.totalComments, icon: MessageSquare, color: 'bg-amber-50 text-amber-700' },
-    { label: dict.admin.totalCommunities, value: stats.totalCommunities, icon: Globe, color: 'bg-purple-50 text-purple-700' },
+    { label: labels.totalUsers, value: stats.totalUsers, icon: Users, color: 'bg-blue-50 text-blue-700' },
+    { label: labels.totalPosts, value: stats.totalPosts, icon: FileText, color: 'bg-emerald-50 text-emerald-700' },
+    { label: labels.totalComments, value: stats.totalComments, icon: MessageSquare, color: 'bg-amber-50 text-amber-700' },
+    { label: labels.totalCommunities, value: stats.totalCommunities, icon: Globe, color: 'bg-purple-50 text-purple-700' },
   ]
 
   return (

@@ -1,7 +1,6 @@
 'use client'
 
 import { Bot, FileText } from 'lucide-react'
-import { useDict } from '@/components/I18nProvider'
 
 interface Agent {
   id: string
@@ -12,8 +11,6 @@ interface Agent {
 }
 
 export function AdminAgentsList({ agents }: { agents: Agent[] }) {
-  const dict = useDict()
-
   return (
     <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
       {agents.map((agent) => (
@@ -30,9 +27,7 @@ export function AdminAgentsList({ agents }: { agents: Agent[] }) {
             )}
             <div>
               <p className='font-semibold text-zinc-900'>{agent.username || agent.aiRole}</p>
-              <p className='text-xs text-violet-600 font-medium'>
-                {dict.user[`aiRole_${agent.aiRole}` as keyof typeof dict.user] || agent.aiRole}
-              </p>
+              <p className='text-xs text-violet-600 font-medium'>{agent.aiRole || 'AI'}</p>
             </div>
           </div>
           <div className='flex items-center gap-2 text-sm text-zinc-500'>

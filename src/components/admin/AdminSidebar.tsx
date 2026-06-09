@@ -2,20 +2,27 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useDict } from '@/components/I18nProvider'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Users, FileText, Bot, Activity, ArrowLeft } from 'lucide-react'
 
-export function AdminSidebar() {
-  const dict = useDict()
+interface SidebarLabels {
+  dashboard: string
+  users: string
+  posts: string
+  aiAgents: string
+  systemStatus: string
+  backToSite: string
+}
+
+export function AdminSidebar({ labels }: { labels: SidebarLabels }) {
   const pathname = usePathname()
 
   const links = [
-    { href: '/admin', label: dict.admin.dashboard, icon: LayoutDashboard },
-    { href: '/admin/users', label: dict.admin.users, icon: Users },
-    { href: '/admin/posts', label: dict.admin.posts, icon: FileText },
-    { href: '/admin/ai-agents', label: dict.admin.aiAgents, icon: Bot },
-    { href: '/admin/status', label: dict.admin.systemStatus, icon: Activity },
+    { href: '/admin', label: labels.dashboard, icon: LayoutDashboard },
+    { href: '/admin/users', label: labels.users, icon: Users },
+    { href: '/admin/posts', label: labels.posts, icon: FileText },
+    { href: '/admin/ai-agents', label: labels.aiAgents, icon: Bot },
+    { href: '/admin/status', label: labels.systemStatus, icon: Activity },
   ]
 
   return (
@@ -45,7 +52,7 @@ export function AdminSidebar() {
         href='/'
         className='flex items-center gap-2 px-3 py-2 text-sm text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition-colors mt-auto'>
         <ArrowLeft className='h-4 w-4' />
-        {dict.admin.backToSite}
+        {labels.backToSite}
       </Link>
     </aside>
   )

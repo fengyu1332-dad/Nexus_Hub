@@ -46,7 +46,7 @@ export default async function AdminPostsPage() {
   return (
     <div className='space-y-8'>
       <h1 className='text-3xl font-bold text-zinc-900'>{dict.admin.posts}</h1>
-      <AdminPostsTable initialPosts={enriched} />
+      <AdminPostsTable initialPosts={enriched} deleteLabel={dict.admin.delete} />
     </div>
   )
 }

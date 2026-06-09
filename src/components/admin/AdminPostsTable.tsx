@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useDict } from '@/components/I18nProvider'
 import { Loader2, Trash2 } from 'lucide-react'
 import axios from 'axios'
 
@@ -13,8 +12,13 @@ interface Post {
   createdAt: string
 }
 
-export function AdminPostsTable({ initialPosts }: { initialPosts: Post[] }) {
-  const dict = useDict()
+export function AdminPostsTable({
+  initialPosts,
+  deleteLabel,
+}: {
+  initialPosts: Post[]
+  deleteLabel: string
+}) {
   const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -81,7 +85,7 @@ export function AdminPostsTable({ initialPosts }: { initialPosts: Post[] }) {
                       ) : (
                         <Trash2 className='h-3 w-3' />
                       )}
-                      {dict.admin.delete}
+                      {deleteLabel}
                     </button>
                   </td>
                 </tr>

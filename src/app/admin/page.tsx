@@ -23,6 +23,12 @@ export default async function AdminDashboard() {
       <h1 className='text-3xl font-bold text-zinc-900'>{dict.admin.dashboard}</h1>
       <AdminStatsCards
         stats={{ totalUsers, totalPosts, totalComments, totalCommunities }}
+        labels={{
+          totalUsers: dict.admin.totalUsers,
+          totalPosts: dict.admin.totalPosts,
+          totalComments: dict.admin.totalComments,
+          totalCommunities: dict.admin.totalCommunities,
+        }}
       />
     </div>
   )

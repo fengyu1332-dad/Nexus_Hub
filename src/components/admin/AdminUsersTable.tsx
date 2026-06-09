@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useDict } from '@/components/I18nProvider'
 import { Loader2, Search, Shield, ShieldOff } from 'lucide-react'
 import axios from 'axios'
 
@@ -15,12 +14,24 @@ interface User {
   isAdmin: boolean
 }
 
-export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
+interface Labels {
+  searchUsers: string
+  noUsers: string
+  makeAdmin: string
+  removeAdmin: string
+}
+
+export function AdminUsersTable({
+  initialUsers,
+  initialTotal,
+  initialPage,
+  labels,
+}: {
   initialUsers: User[]
   initialTotal: number
   initialPage: number
+  labels: Labels
 }) {
-  const dict = useDict()
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [total, setTotal] = useState(initialTotal)
   const [page, setPage] = useState(initialPage)
@@ -50,7 +61,6 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
       await axios.patch(`/api/admin/users/${user.id}`, { isAdmin: updated })
       setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isAdmin: updated } : u)))
     } catch {
-      // revert on failure by re-fetching
       fetchUsers(page, search)
     }
   }
@@ -59,13 +69,12 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
 
   return (
     <div className='space-y-4'>
-      {/* Search */}
       <div className='flex items-center gap-2'>
         <div className='relative flex-1 max-w-sm'>
           <Search className='absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400' />
           <input
             type='text'
-            placeholder={dict.admin.searchUsers}
+            placeholder={labels.searchUsers}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchUsers(1, search)}
@@ -79,7 +88,6 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
         </button>
       </div>
 
-      {/* Table */}
       <div className='border border-zinc-200 rounded-lg overflow-hidden'>
         {loading && (
           <div className='flex items-center justify-center py-8'>
@@ -87,7 +95,7 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
           </div>
         )}
         {!loading && users.length === 0 && (
-          <p className='text-zinc-500 text-sm py-8 text-center'>{dict.admin.noUsers}</p>
+          <p className='text-zinc-500 text-sm py-8 text-center'>{labels.noUsers}</p>
         )}
         {!loading && users.length > 0 && (
           <table className='w-full text-sm'>
@@ -141,9 +149,9 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
                           : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                       }`}>
                       {user.isAdmin ? (
-                        <><ShieldOff className='h-3 w-3' /> {dict.admin.removeAdmin}</>
+                        <><ShieldOff className='h-3 w-3' /> {labels.removeAdmin}</>
                       ) : (
-                        <><Shield className='h-3 w-3' /> {dict.admin.makeAdmin}</>
+                        <><Shield className='h-3 w-3' /> {labels.makeAdmin}</>
                       )}
                     </button>
                   </td>
@@ -154,7 +162,6 @@ export function AdminUsersTable({ initialUsers, initialTotal, initialPage }: {
         )}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className='flex items-center justify-between text-sm text-zinc-500'>
           <span>共 {total} 用户</span>

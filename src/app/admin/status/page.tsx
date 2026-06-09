@@ -44,6 +44,13 @@ export default async function AdminStatusPage() {
           redis: { status: redisStatus, latencyMs: redisLatency },
           uptimeMs: Date.now() - startTime,
         }}
+        labels={{
+          database: dict.admin.database,
+          redis: dict.admin.redis,
+          uptime: dict.admin.uptime,
+          healthy: dict.admin.healthy,
+          unhealthy: dict.admin.unhealthy,
+        }}
       />
     </div>
   )
