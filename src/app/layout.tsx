@@ -51,9 +51,9 @@ export default function RootLayout({
           <div className='container max-w-7xl mx-auto h-full pt-12'>
             <ErrorBoundary fallbackMessage={dict.errorPage.fallbackMessage}>{children}</ErrorBoundary>
           </div>
+          <FloraChat />
         </Providers>
         <Toaster />
-        <FloraChat />
       </body>
     </html>
   )
