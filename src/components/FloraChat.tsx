@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Flower2, Send, X, Minimize2, Maximize2, Loader2, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useDict } from '@/components/I18nProvider'
+import type { Dictionary } from '@/i18n/types'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -92,8 +92,7 @@ function ChatBubble({
 
 // ── Main Component ─────────────────────────────────────────
 
-export function FloraChat() {
-  const dict = useDict()
+export function FloraChat({ dict }: { dict: Dictionary }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>(() => [
