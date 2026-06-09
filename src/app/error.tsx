@@ -1,7 +1,5 @@
 'use client'
 
-import { useDict } from '@/components/I18nProvider'
-
 export default function Error({
   error,
   reset,
@@ -9,11 +7,9 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  const dict = useDict()
-
   return (
     <div className='p-8 max-w-2xl mx-auto'>
-      <h2 className='text-lg font-bold text-red-600 mb-4'>{dict.errorPage.heading}</h2>
+      <h2 className='text-lg font-bold text-red-600 mb-4'>页面出错了 / Something went wrong</h2>
       <pre className='bg-red-50 p-4 rounded text-sm overflow-auto'>
         {error.message}
         {error.digest && `\n\nDigest: ${error.digest}`}
@@ -22,7 +18,7 @@ export default function Error({
       <button
         onClick={reset}
         className='mt-4 px-4 py-2 bg-zinc-900 text-white rounded'>
-        {dict.errorPage.retry}
+        重试 / Retry
       </button>
     </div>
   )
