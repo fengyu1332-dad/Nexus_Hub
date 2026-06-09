@@ -1,5 +1,5 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import Navbar from '@/components/Navbar'
+
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
 
 import { cn } from '@/lib/utils'
@@ -44,8 +44,6 @@ export default function RootLayout({
       <body className='min-h-screen pt-12 bg-slate-50 antialiased'>
         <AnalyticsProvider />
         <Providers dictZhCN={zhCN} dictEn={en} initialLocale={locale}>
-          {/* @ts-expect-error Server Component */}
-          <Navbar />
           {authModal}
 
           <div className='container max-w-7xl mx-auto h-full pt-12'>
