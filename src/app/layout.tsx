@@ -1,7 +1,7 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import Navbar from '@/components/Navbar'
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
-import { FloraChat } from '@/components/FloraChat'
+
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -53,7 +53,6 @@ export default function RootLayout({
           </div>
         </Providers>
         <Toaster />
-        <FloraChat dict={dict} />
       </body>
     </html>
   )
