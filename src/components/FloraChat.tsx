@@ -12,7 +12,7 @@ interface Message {
   role: 'user' | 'flora'
   content: string
   timestamp: number
-  sources?: { title: string; postId: string; similarity: number }[]
+  sources?: { title: string; postId: string; subredditName?: string; similarity: number }[]
 }
 
 // ── Sub-components ────────────────────────────────────────
@@ -45,18 +45,23 @@ function ChatBubble({ msg }: { msg: Message }) {
 
         {/* Sources */}
         {msg.sources && msg.sources.length > 0 && (
-          <div className='mt-2 pt-2 border-t border-rose-200/50'>
-            <p className='text-[10px] text-rose-500 font-medium mb-1'>
-              参考文章：
+          <div className='mt-3 pt-2.5 border-t border-rose-200/50'>
+            <p className='text-[10px] text-rose-400 font-medium mb-2 uppercase tracking-wide'>
+              参考文章
             </p>
             {msg.sources.slice(0, 2).map((s) => (
               <a
                 key={s.postId}
-                href={`/r/DevShowcase/post/${s.postId}`}
+                href={`/r/${s.subredditName || 'DevShowcase'}/post/${s.postId}`}
                 target='_blank'
                 rel='noopener'
-                className='block text-[10px] text-rose-400 hover:text-rose-600 truncate'>
-                📄 {s.title}
+                className='block mb-1.5 rounded-lg border border-rose-200 bg-white/60 px-3 py-2 hover:bg-white hover:border-rose-300 hover:shadow-sm transition-all group'>
+                <p className='text-xs font-medium text-zinc-700 group-hover:text-rose-600 truncate leading-snug'>
+                  {s.title}
+                </p>
+                <span className='text-[10px] text-rose-400 group-hover:text-rose-500'>
+                  阅读原文 →
+                </span>
               </a>
             ))}
           </div>
@@ -107,6 +112,15 @@ export function FloraChat() {
       timestamp: Date.now(),
     }
 
+    // Build history from last 5 rounds (10 messages), excluding welcome
+    const history = messages
+      .filter((m) => m.id !== 'welcome')
+      .slice(-10)
+      .map((m) => ({
+        role: m.role,
+        content: m.content.substring(0, 1000),
+      }))
+
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
@@ -115,7 +129,7 @@ export function FloraChat() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, history }),
       })
 
       const data = await res.json()

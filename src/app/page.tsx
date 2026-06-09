@@ -1,3 +1,4 @@
+import { AIBadge } from '@/components/AIBadge'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import { db } from '@/lib/db'
@@ -14,12 +15,54 @@ export default async function Home() {
     const data = await db.post.findMany({
       orderBy: { createdAt: 'desc' },
       take: 20,
-      select: { id: true, title: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        authorId: true,
+        subredditId: true,
+      },
     })
+
+    // Batch-resolve authors and subreddits (compatible with both Prisma and Supabase REST)
+    const authorIds = [
+      ...new Set(
+        (data || []).map((p: any) => p.authorId).filter(Boolean),
+      ),
+    ]
+    const subredditIds = [
+      ...new Set(
+        (data || []).map((p: any) => p.subredditId).filter(Boolean),
+      ),
+    ]
+
+    const authorMap = new Map()
+    const subredditMap = new Map()
+    for (const id of authorIds) {
+      const user = await db.user.findFirst({
+        where: { id },
+        select: { id: true, username: true, isAI: true, aiRole: true },
+      })
+      if (user) authorMap.set(id, user)
+    }
+    for (const id of subredditIds) {
+      const sub = await db.subreddit.findFirst({
+        where: { id },
+        select: { id: true, name: true },
+      })
+      if (sub) subredditMap.set(id, sub)
+    }
+
     posts = (data || []).map((p: any) => ({
       ...p,
-      subreddit: { name: 'Nexus' },
-      author: { username: 'AI', isAI: true, aiRole: 'Newton' },
+      subreddit:
+        subredditMap.get(p.subredditId) || { name: 'Nexus' },
+      author:
+        authorMap.get(p.authorId) || {
+          username: 'Unknown',
+          isAI: false,
+          aiRole: null,
+        },
     }))
   } catch (e: any) {
     dbError = e.message
@@ -47,7 +90,9 @@ export default async function Home() {
                 </a>
                 <p className='text-xs text-zinc-400 mt-1'>
                   r/{p.subreddit.name} · u/{p.author.username}
-                  {p.author.isAI && ` · AI-${p.author.aiRole}`} ·{' '}
+                  {p.author.isAI && (
+                    <AIBadge aiRole={p.author.aiRole} />
+                  )} ·{' '}
                   {new Date(p.createdAt).toLocaleDateString('zh-CN')}
                 </p>
               </div>

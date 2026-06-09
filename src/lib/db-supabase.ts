@@ -18,6 +18,14 @@ type Filter = Record<string, unknown>
 type Select = Record<string, boolean | Record<string, boolean>>
 type OrderBy = Record<string, 'asc' | 'desc'>
 
+// ── ID 生成 ──────────────────────────────────────────
+
+let _counter = 0
+function generateId(): string {
+  _counter++
+  return `c_${Date.now().toString(36)}_${_counter.toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
 // ── Supabase → Prisma 兼容包装 ────────────────────────
 
 function buildSelect(fields?: Select): string {
@@ -125,9 +133,11 @@ export const db = {
     },
 
     async create(opts: { data: Record<string, unknown> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, updatedAt: now, ...opts.data }
       const { data, error } = await supabase
         .from('Post')
-        .insert(opts.data)
+        .insert(record)
         .select()
         .single()
       if (error) throw error
@@ -184,9 +194,33 @@ export const db = {
           postQuery.limit(opts.include.posts.take)
         }
         const { data: posts } = await postQuery
+
+        // Batch-resolve post authors
+        const authorIds = [
+          ...new Set(
+            (posts || [])
+              .map((p: any) => p.authorId)
+              .filter(Boolean),
+          ),
+        ]
+        const authorMap = new Map()
+        for (const aid of authorIds) {
+          const { data: userData } = await supabase
+            .from('User')
+            .select('id,username,isAI,aiRole')
+            .eq('id', aid)
+            .limit(1)
+          if (userData?.[0]) authorMap.set(aid, userData[0])
+        }
+
         result.posts = (posts || []).map((p: any) => ({
           ...p,
-          author: { username: 'AI', isAI: true, aiRole: null },
+          author:
+            authorMap.get(p.authorId) || {
+              username: 'Unknown',
+              isAI: false,
+              aiRole: null,
+            },
           votes: [],
           comments: [],
           subreddit: { name: sub.name, id: sub.id },
@@ -212,9 +246,11 @@ export const db = {
     },
 
     async create(opts: { data: Record<string, unknown> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, updatedAt: now, ...opts.data }
       const { data, error } = await supabase
         .from('Subreddit')
-        .insert(opts.data)
+        .insert(record)
         .select()
         .single()
       if (error) throw error
@@ -324,6 +360,20 @@ export const db = {
   // ═══════════════════════════════════════════════════
 
   newsletterSubscriber: {
+    async findMany(opts: { where: Filter; select?: Select }) {
+      let query = supabase
+        .from('NewsletterSubscriber')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
     async upsert(opts: {
       where: { email: string }
       update: Record<string, unknown>
@@ -345,9 +395,10 @@ export const db = {
         if (error) throw error
         return data
       } else {
+        const record = { id: generateId(), subscribedAt: new Date().toISOString(), ...opts.create }
         const { data, error } = await supabase
           .from('NewsletterSubscriber')
-          .insert(opts.create)
+          .insert(record)
           .select()
           .single()
         if (error) throw error

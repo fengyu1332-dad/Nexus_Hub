@@ -1,2 +1,2 @@
-// 2 to demonstrate infinite scroll, should be higher in production
-export const INFINITE_SCROLL_PAGINATION_RESULTS = 2
+export const INFINITE_SCROLL_PAGINATION_RESULTS =
+  parseInt(process.env.NEXT_PUBLIC_PAGE_SIZE || '10', 10)

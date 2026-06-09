@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { sendWelcomeEmail } from '@/lib/email'
 import { z } from 'zod'
 
 const SubscribeValidator = z.object({
@@ -22,6 +23,11 @@ export async function POST(req: Request) {
         confirmed: true, // MVP 简化：直接确认
       },
     })
+
+    // 异步发送欢迎邮件（不阻塞响应）
+    sendWelcomeEmail(email).catch((e) =>
+      console.error('[newsletter] Welcome email failed:', e)
+    )
 
     return new Response(
       JSON.stringify({

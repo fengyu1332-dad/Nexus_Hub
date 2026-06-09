@@ -14,6 +14,15 @@ import { z } from 'zod'
 
 const ChatValidator = z.object({
   message: z.string().min(1).max(2000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'flora']),
+        content: z.string().max(1000),
+      })
+    )
+    .max(10)
+    .optional(),
 })
 
 // ── Embedding API 调用 ─────────────────────────────────────
@@ -154,7 +163,8 @@ async function semanticRetrieval(query: string, topK = 3) {
 
 async function chatWithFlora(
   message: string,
-  context: string
+  context: string,
+  history?: { role: string; content: string }[]
 ): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY
   const apiBase =
@@ -189,6 +199,10 @@ async function chatWithFlora(
       max_tokens: 1024,
       messages: [
         { role: 'system', content: FLORA_SYSTEM_PROMPT },
+        ...(history || []).map((h) => ({
+          role: h.role === 'flora' ? ('assistant' as const) : ('user' as const),
+          content: h.content,
+        })),
         { role: 'user', content: buildFloraUserMessage(message, context) },
       ],
     }),
@@ -214,16 +228,52 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { message } = ChatValidator.parse(body)
+    const { message, history } = ChatValidator.parse(body)
 
     // 1. 语义检索 top-3 相关文章
     const retrieved = await semanticRetrieval(message, 3)
+
+    // 1.5 Batch-resolve subreddit names for source links
+    const postIds = retrieved.map((r) => r.postId)
+    const subMap = new Map<string, string>()
+    if (postIds.length > 0) {
+      try {
+        const rows = await db.$queryRawUnsafe<
+          { id: string; subredditId: string }[]
+        >(
+          `SELECT "id", "subredditId" FROM "Post" WHERE "id" IN (${postIds.map((_, i) => `$${i + 1}`).join(',')})`,
+          ...postIds
+        )
+        const subIds = [...new Set(rows.map((r) => r.subredditId))]
+        for (const sid of subIds) {
+          const sub = await db.subreddit.findFirst({
+            where: { id: sid },
+            select: { name: true },
+          })
+          // subreddit.findFirst may return the name directly or nested
+          const name = (sub as any)?.name || 'DevShowcase'
+          subMap.set(sid, name)
+        }
+        for (const row of rows) {
+          if (subMap.has(row.subredditId)) {
+            // attach to the corresponding retrieved item
+            const item = retrieved.find((r) => r.postId === row.id)
+            if (item) (item as any).subredditName = subMap.get(row.subredditId)
+          }
+        }
+      } catch {
+        // Fallback: use default subreddit name
+        for (const r of retrieved) {
+          ;(r as any).subredditName = 'DevShowcase'
+        }
+      }
+    }
 
     // 2. 构建上下文
     const context = buildFloraContext(retrieved)
 
     // 3. 调用 DeepSeek 生成回复
-    const reply = await chatWithFlora(message, context)
+    const reply = await chatWithFlora(message, context, history)
 
     // 4. 返回
     return new Response(
@@ -232,6 +282,7 @@ export async function POST(req: Request) {
         sources: retrieved.map((r) => ({
           title: r.title,
           postId: r.postId,
+          subredditName: (r as any).subredditName || 'DevShowcase',
           similarity: r.similarity,
         })),
       }),

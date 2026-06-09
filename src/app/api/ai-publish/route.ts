@@ -70,9 +70,7 @@ export async function POST(req: Request) {
       return new Response(error.message, { status: 400 })
     }
 
-    console.error('[ai-publish] Unexpected error:', error)
-    return new Response('Could not create AI post at this time', {
-      status: 500,
-    })
+    console.error('[ai-publish] Unexpected error:', error instanceof Error ? error.message : String(error))
+    return new Response('Could not create AI post at this time', { status: 500 })
   }
 }

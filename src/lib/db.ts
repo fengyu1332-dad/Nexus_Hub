@@ -7,7 +7,9 @@ import 'server-only'
 // ═══════════════════════════════════════════════════════
 
 const isVercel =
-  process.env.VERCEL === '1' || process.env.VERCEL_ENV !== undefined
+  process.env.VERCEL === '1' ||
+  process.env.VERCEL_ENV !== undefined ||
+  process.env.USE_SUPABASE_REST === '1'
 
 let _db: any = null
 
