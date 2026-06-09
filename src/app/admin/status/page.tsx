@@ -14,30 +14,38 @@ export default async function AdminStatusPage() {
   const dict = getDictionary()
 
   // DB check
-  let dbStatus: 'ok' | 'error' = 'ok'
+  let dbStatus: 'ok' | 'error' = 'error'
   let dbLatency = 0
+  let dbError: string | null = null
   try {
     const t0 = Date.now()
     await db.user.count({ where: {} })
     dbLatency = Date.now() - t0
-  } catch {
-    dbStatus = 'error'
+    dbStatus = 'ok'
+  } catch (e: any) {
+    dbError = e.message || String(e)
   }
 
   // Redis check
-  let redisStatus: 'ok' | 'error' = 'ok'
+  let redisStatus: 'ok' | 'error' = 'error'
   let redisLatency = 0
   try {
     const t0 = Date.now()
     await redis.ping()
     redisLatency = Date.now() - t0
+    redisStatus = 'ok'
   } catch {
-    redisStatus = 'error'
+    // Redis unavailable
   }
 
   return (
     <div className='space-y-8'>
       <h1 className='text-3xl font-bold text-zinc-900'>{dict.admin.systemStatus}</h1>
+      {dbError && (
+        <div className='p-4 bg-red-50 rounded border border-red-200 text-sm text-red-600'>
+          DB 检查失败: {dbError}
+        </div>
+      )}
       <AdminStatusCards
         status={{
           database: { status: dbStatus, latencyMs: dbLatency },
