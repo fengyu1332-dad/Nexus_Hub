@@ -1,8 +1,9 @@
 import { AIBadge } from '@/components/AIBadge'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
+import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { Home as HomeIcon } from 'lucide-react'
+import { Home as HomeIcon, User } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -10,11 +11,29 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   let posts: any[] = []
   let dbError: string | null = null
+  let isPersonalized = false
 
   try {
+    // Check if user is logged in and has subscriptions
+    const session = await getAuthSession()
+    let subscribedIds: string[] = []
+
+    if (session?.user) {
+      try {
+        const subs = await db.subscription.findMany({
+          where: { userId: session.user.id },
+          select: { subredditId: true },
+        })
+        subscribedIds = (subs || []).map((s: any) => s.subredditId)
+        isPersonalized = subscribedIds.length > 0
+      } catch {
+        // Subscription lookup unavailable — fallback to all posts
+      }
+    }
+
     const data = await db.post.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: isPersonalized ? 50 : 20,
       select: {
         id: true,
         title: true,
@@ -24,16 +43,26 @@ export default async function Home() {
       },
     })
 
-    // Batch-resolve authors and subreddits (compatible with both Prisma and Supabase REST)
+    // If personalized, filter to subscribed subreddits first
+    if (isPersonalized && subscribedIds.length > 0) {
+      const filtered = (data || []).filter((p: any) =>
+        subscribedIds.includes(p.subredditId)
+      )
+      // If not enough posts from subscriptions, add some general posts
+      const general = (data || []).filter(
+        (p: any) => !subscribedIds.includes(p.subredditId)
+      )
+      posts = [...filtered, ...general].slice(0, 20)
+    } else {
+      posts = data || []
+    }
+
+    // Batch-resolve authors and subreddits
     const authorIds = [
-      ...new Set(
-        (data || []).map((p: any) => p.authorId).filter(Boolean),
-      ),
+      ...new Set(posts.map((p: any) => p.authorId).filter(Boolean)),
     ]
     const subredditIds = [
-      ...new Set(
-        (data || []).map((p: any) => p.subredditId).filter(Boolean),
-      ),
+      ...new Set(posts.map((p: any) => p.subredditId).filter(Boolean)),
     ]
 
     const authorMap = new Map()
@@ -53,7 +82,7 @@ export default async function Home() {
       if (sub) subredditMap.set(id, sub)
     }
 
-    posts = (data || []).map((p: any) => ({
+    posts = posts.map((p: any) => ({
       ...p,
       subreddit:
         subredditMap.get(p.subredditId) || { name: 'Nexus' },
@@ -105,14 +134,15 @@ export default async function Home() {
           <div className='bg-emerald-100 px-6 py-4'>
             <p className='font-semibold py-3 flex items-center gap-1.5'>
               <HomeIcon className='h-4 w-4' />
-              Home
+              {isPersonalized ? 'Your Feed' : 'Home'}
             </p>
           </div>
           <dl className='-my-3 divide-y divide-gray-100 px-6 py-4 text-sm leading-6'>
             <div className='flex justify-between gap-x-4 py-3'>
               <p className='text-zinc-500'>
-                Your personal Breadit frontpage. Come here to check in with your
-                favorite communities.
+                {isPersonalized
+                  ? 'Showing posts from your subscribed communities, plus trending topics from across Nexus Hub.'
+                  : 'Your personal Breadit frontpage. Come here to check in with your favorite communities.'}
               </p>
             </div>
 

@@ -92,6 +92,51 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "retry-limit",
+              "leftValue": "={{ $json._retry_count }}",
+              "rightValue": 2,
+              "operator": { "type": "number", "operation": "smaller" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sherlock-retry-if",
+      "name": "🔁 重试次数检查",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// Sherlock 最大重试已达上限 — 触发人工审阅\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\n\nreturn {\n  ...data,\n  _sherlock_aborted: true,\n  _abort_reason: `事实核查已重试 ${data._retry_count} 次仍未通过，需要人工审阅。`,\n  _critical_alert: true\n};"
+      },
+      "id": "sherlock-max-retries",
+      "name": "🚨 人工审阅 (Max Retries)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ──────────────────────────────────────────────\n// 重试中 — 输出修正提示，由主流水线路由回 Newton\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\n\nreturn {\n  ...data,\n  _sherlock_retrying: true,\n  _retry_count: data._retry_count\n};"
+      },
+      "id": "sherlock-retry-ok",
+      "name": "🔁 发送修正提示 (Retry OK)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
         "jsCode": "// ──────────────────────────────────────────────\n// Sherlock 通过: 附加核查签章\n// ──────────────────────────────────────────────\n\nconst data = $input.first().json;\n\n// 在文章末尾追加核查签章\nconst signedContent = (data._newton_draft || data.content || '') +\n  `\\n\\n---\\n> ✅ 本文已通过 Sherlock 事实核查 (${new Date().toISOString().slice(0, 10)})`;\n\nreturn {\n  ...data,\n  content: signedContent,\n  _sherlock_verified: true,\n  _verified_at: new Date().toISOString()\n};"
       },
       "id": "sherlock-approve",
@@ -111,9 +156,16 @@
         [{ "node": "✅ 核查通过 (Approve)", "type": "main", "index": 0 }],
         [{ "node": "❌ 打回修正 (Reject)", "type": "main", "index": 0 }]
       ]
+    },
+    "❌ 打回修正 (Reject)": { "main": [[{ "node": "🔁 重试次数检查", "type": "main", "index": 0 }]] },
+    "🔁 重试次数检查": {
+      "main": [
+        [{ "node": "🔁 发送修正提示 (Retry OK)", "type": "main", "index": 0 }],
+        [{ "node": "🚨 人工审阅 (Max Retries)", "type": "main", "index": 0 }]
+      ]
     }
   },
   "settings": { "callerPolicy": "workflowsFromSameOwner" },
-  "versionId": "sherlock-v1",
+  "versionId": "sherlock-v2",
   "active": false
 }

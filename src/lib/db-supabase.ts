@@ -34,11 +34,21 @@ function buildSelect(fields?: Select): string {
     .filter(([, v]) => v)
     .map(([k, v]) => {
       if (typeof v === 'object' && v !== null) {
-        const subFields = Object.entries(v as Record<string, boolean>)
+        // Handle Prisma-style nested select: { author: { select: { username: true } } }
+        const inner = v as Record<string, unknown>
+        if (inner.select && typeof inner.select === 'object') {
+          const subFields = Object.entries(inner.select as Record<string, boolean>)
+            .filter(([, sv]) => sv)
+            .map(([sk]) => sk)
+            .join(',')
+          return `${k}(${subFields})`
+        }
+        // Handle flat boolean: { author: true }
+        const subFields = Object.entries(inner)
           .filter(([, sv]) => sv)
           .map(([sk]) => sk)
           .join(',')
-        return `${k}(${subFields})`
+        return subFields ? `${k}(${subFields})` : k
       }
       return k
     })
@@ -74,7 +84,9 @@ export const db = {
       // 过滤
       if (opts?.where) {
         for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'gte' in (val as any)) {
+          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
+            query = query.ilike(col, `${(val as any).startsWith}%`)
+          } else if (typeof val === 'object' && val !== null && 'gte' in (val as any)) {
             query = query.gte(col, (val as any).gte)
           } else {
             query = query.eq(col, val)
@@ -93,6 +105,7 @@ export const db = {
     async findFirst(opts?: {
       where?: Filter
       select?: Select
+      include?: Record<string, any>
       orderBy?: OrderBy
     }) {
       let query = supabase
@@ -101,7 +114,11 @@ export const db = {
 
       if (opts?.where) {
         for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
+          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
+            query = query.ilike(col, `${(val as any).startsWith}%`)
+          } else {
+            query = query.eq(col, val)
+          }
         }
       }
       if (opts?.orderBy) {
@@ -112,7 +129,35 @@ export const db = {
 
       const { data, error } = await query.limit(1)
       if (error) throw error
-      return data?.[0] || null
+      const post = data?.[0] || null
+      if (!post) return null
+
+      // Resolve include relations
+      const result: any = { ...post }
+      if (opts?.include?.author) {
+        const { data: userData } = await supabase
+          .from('User')
+          .select('*')
+          .eq('id', post.authorId)
+          .limit(1)
+        result.author = userData?.[0] || null
+      }
+      if (opts?.include?.votes) {
+        const { data: votesData } = await supabase
+          .from('Vote')
+          .select('*')
+          .eq('postId', post.id)
+        result.votes = votesData || []
+      }
+      if (opts?.include?.subreddit) {
+        const { data: subData } = await supabase
+          .from('Subreddit')
+          .select('*')
+          .eq('id', post.subredditId)
+          .limit(1)
+        result.subreddit = subData?.[0] || null
+      }
+      return result
     },
 
     async findUnique(opts: {
@@ -124,12 +169,31 @@ export const db = {
         .from('Post')
         .select(buildSelect(opts?.select))
 
-      const { data, error } = await query.eq('id', opts.where.id).single()
+      const { data: post, error } = await query.eq('id', opts.where.id).single()
       if (error) {
         if (error.code === 'PGRST116') return null
         throw error
       }
-      return data || null
+      if (!post) return null
+
+      // Resolve include relations
+      const result: any = { ...post }
+      if (opts?.include?.votes) {
+        const { data: votesData } = await supabase
+          .from('Vote')
+          .select('*')
+          .eq('postId', post.id)
+        result.votes = votesData || []
+      }
+      if (opts?.include?.author) {
+        const { data: userData } = await supabase
+          .from('User')
+          .select('*')
+          .eq('id', post.authorId)
+          .limit(1)
+        result.author = userData?.[0] || null
+      }
+      return result
     },
 
     async create(opts: { data: Record<string, unknown> }) {
@@ -172,7 +236,11 @@ export const db = {
       // 1. 先查 Subreddit
       let query = supabase.from('Subreddit').select('*')
       for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
+        if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
+          query = query.ilike(col, `${(val as any).startsWith}%`)
+        } else {
+          query = query.eq(col, val)
+        }
       }
       const { data: sub, error } = await query.limit(1).single()
       if (error) {
@@ -229,16 +297,28 @@ export const db = {
       return result
     },
 
-    async findMany(opts?: { select?: Select; orderBy?: OrderBy }) {
+    async findMany(opts?: { where?: Filter; select?: Select; orderBy?: OrderBy; take?: number; include?: Record<string, any> }) {
       let query = supabase
         .from('Subreddit')
         .select(buildSelect(opts?.select))
+
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
+            query = query.ilike(col, `${(val as any).startsWith}%`)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
 
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
         }
       }
+
+      if (opts?.take) query = query.limit(opts.take)
 
       const { data, error } = await query
       if (error) throw error
@@ -414,6 +494,62 @@ export const db = {
         .from('NewsletterSubscriber')
         .update(opts.data)
         .eq('email', opts.where.email)
+      if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  Subscription
+  // ═══════════════════════════════════════════════════
+
+  subscription: {
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase
+        .from('Subscription')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async findMany(opts: { where: Filter; select?: Select }) {
+      let query = supabase
+        .from('Subscription')
+        .select(buildSelect(opts?.select))
+
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('Subscription')
+        .insert(opts.data)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async delete(opts: {
+      where: { userId_subredditId: { userId: string; subredditId: string } }
+    }) {
+      const { userId, subredditId } = opts.where.userId_subredditId
+      const { error } = await supabase
+        .from('Subscription')
+        .delete()
+        .eq('userId', userId)
+        .eq('subredditId', subredditId)
       if (error) throw error
     },
   },

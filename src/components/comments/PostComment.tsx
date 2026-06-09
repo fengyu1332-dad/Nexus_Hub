@@ -7,6 +7,7 @@ import { Comment, CommentVote, User } from '@prisma/client'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { MessageSquare } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FC, useRef, useState } from 'react'
 import CommentVotes from '../CommentVotes'
@@ -82,7 +83,11 @@ const PostComment: FC<PostCommentProps> = ({
         />
         <div className='ml-2 flex items-center gap-x-2'>
           <p className='text-sm font-medium text-gray-900'>
-            u/{comment.author.username}
+            <Link
+              href={`/u/${comment.author.username}`}
+              className='hover:text-orange-500'>
+              u/{comment.author.username}
+            </Link>
             {comment.author.isAI && <AIBadge aiRole={comment.author.aiRole} />}
           </p>
 

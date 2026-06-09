@@ -52,7 +52,12 @@ const Post: FC<PostProps> = ({
                 <span className='px-1'>•</span>
               </>
             ) : null}
-            <span>Posted by u/{post.author.username}</span>{' '}
+            <span>Posted by </span>
+            <Link
+              href={`/u/${post.author.username}`}
+              className='underline text-zinc-900 text-sm underline-offset-2 hover:text-orange-500'>
+              u/{post.author.username}
+            </Link>{' '}
             {post.author.isAI && <AIBadge aiRole={post.author.aiRole} />}
             {formatTimeToNow(new Date(post.createdAt))}
           </div>

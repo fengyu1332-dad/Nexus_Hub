@@ -35,30 +35,34 @@ const Layout = async ({
     },
   })
 
-  const subscription = !session?.user
-    ? undefined
-    : await db.subscription.findFirst({
+  if (!subreddit) return notFound()
+
+  let subscription: any = undefined
+  if (session?.user) {
+    try {
+      const subs = await db.subscription.findMany({
         where: {
-          subreddit: {
-            name: slug,
-          },
-          user: {
-            id: session.user.id,
-          },
+          userId: session.user.id,
+          subredditId: subreddit.id,
         },
       })
+      subscription = subs?.[0] || undefined
+    } catch {
+      subscription = undefined
+    }
+  }
 
   const isSubscribed = !!subscription
 
-  if (!subreddit) return notFound()
-
-  const memberCount = await db.subscription.count({
-    where: {
-      subreddit: {
-        name: slug,
-      },
-    },
-  })
+  let memberCount = 0
+  try {
+    const subs = await db.subscription.findMany({
+      where: { subredditId: subreddit.id },
+    })
+    memberCount = (subs || []).length
+  } catch {
+    memberCount = 0
+  }
 
   return (
     <div className='sm:container max-w-7xl mx-auto h-full pt-12'>
@@ -77,8 +81,8 @@ const Layout = async ({
               <div className='flex justify-between gap-x-4 py-3'>
                 <dt className='text-gray-500'>Created</dt>
                 <dd className='text-gray-700'>
-                  <time dateTime={subreddit.createdAt.toDateString()}>
-                    {format(subreddit.createdAt, 'MMMM d, yyyy')}
+                  <time dateTime={new Date(subreddit.createdAt).toDateString()}>
+                    {format(new Date(subreddit.createdAt), 'MMMM d, yyyy')}
                   </time>
                 </dd>
               </div>

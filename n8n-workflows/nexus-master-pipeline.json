@@ -34,7 +34,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "{\n  \"url\": \"https://example.com\"\n}",
+        "jsonBody": "{\n  \"url\": \"{{ $json.targetUrl }}\"\n}",
         "options": { "timeout": 30000 }
       },
       "id": "master-owl-scrape",
