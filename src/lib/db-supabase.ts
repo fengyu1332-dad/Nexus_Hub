@@ -456,6 +456,17 @@ export const db = {
       return count || 0
     },
 
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = { id: generateId(), ...opts.data }
+      const { data, error } = await supabase
+        .from('User')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
     async update(opts: {
       where: { id: string }
       data: Record<string, unknown>

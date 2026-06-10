@@ -16,6 +16,36 @@ export const authOptions: NextAuthOptions = {
       : []),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === 'google') {
+        try {
+          // 查找或创建用户记录
+          let dbUser = await db.user.findFirst({
+            where: { email: user.email! },
+            select: { id: true, isAdmin: true, username: true },
+          })
+          if (!dbUser) {
+            dbUser = await db.user.create({
+              data: {
+                email: user.email!,
+                username: user.name?.replace(/\s+/g, '_').toLowerCase() ?? user.email!.split('@')[0],
+                name: user.name ?? '',
+                image: user.image ?? '',
+                isAdmin: user.email === process.env.ADMIN_EMAIL,
+              },
+            })
+          }
+          // 将数据库 ID 挂到 profile 上，供 jwt 回调使用
+          ;(user as any).dbId = (dbUser as any).id
+          ;(user as any).dbIsAdmin = (dbUser as any).isAdmin ?? false
+          ;(user as any).dbUsername = (dbUser as any).username
+        } catch (e) {
+          console.error('[auth] signIn callback error:', e instanceof Error ? e.message : String(e))
+          return true // 即使 DB 失败也允许登录，降级
+        }
+      }
+      return true
+    },
     async session({ token, session }) {
       if (token) {
         session.user.id = token.id ?? token.sub ?? ''
@@ -29,21 +59,9 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-      }
-      if (token.id) {
-        try {
-          const dbUser = await db.user.findFirst({
-            where: { id: token.id },
-            select: { isAdmin: true, username: true },
-          })
-          if (dbUser) {
-            token.isAdmin = (dbUser as any).isAdmin ?? false
-            token.username = (dbUser as any).username ?? (token.username as any)
-          }
-        } catch {
-          // keep existing token values on DB failure
-        }
+        token.id = (user as any).dbId ?? user.id
+        token.isAdmin = (user as any).dbIsAdmin ?? false
+        token.username = (user as any).dbUsername ?? (token.username as any)
       }
       return token
     },
