@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getDictionary } from '@/i18n'
+import SortSelector from '@/components/SortSelector'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export default async function Home() {
   return (
     <div className='p-8'>
       <h1 className='font-bold text-3xl md:text-4xl'>{dict.home.nexusHub}</h1>
+      <SortSelector />
       {dbError ? (
         <p className='text-red-500 mt-2'>DB Error: {dbError}</p>
       ) : (
