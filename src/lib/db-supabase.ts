@@ -55,6 +55,73 @@ function buildSelect(fields?: Select): string {
     .join(',')
 }
 
+// ── Include 批量解析 ─────────────────────────────────
+
+async function resolvePostIncludes(
+  posts: any[],
+  include?: Record<string, any>
+): Promise<any[]> {
+  if (!include) return posts
+
+  const postIds = posts.map((p: any) => p.id)
+
+  // Collect unique subreddit IDs
+  const subMap = new Map<string, any>()
+  if (include.subreddit) {
+    const subIds = [...new Set(posts.map((p: any) => p.subredditId).filter(Boolean))]
+    for (const sid of subIds) {
+      const { data } = await supabase
+        .from('Subreddit')
+        .select('*')
+        .eq('id', sid)
+        .limit(1)
+      if (data?.[0]) subMap.set(sid, data[0])
+    }
+  }
+
+  // Collect unique author IDs
+  const authorMap = new Map<string, any>()
+  if (include.author) {
+    const authorIds = [...new Set(posts.map((p: any) => p.authorId).filter(Boolean))]
+    for (const aid of authorIds) {
+      const { data } = await supabase
+        .from('User')
+        .select('*')
+        .eq('id', aid)
+        .limit(1)
+      if (data?.[0]) authorMap.set(aid, data[0])
+    }
+  }
+
+  // Fetch votes for all posts
+  let allVotes: any[] = []
+  if (include.votes) {
+    const { data } = await supabase
+      .from('Vote')
+      .select('*')
+      .in('postId', postIds)
+    allVotes = data || []
+  }
+
+  // Fetch comments for all posts
+  let allComments: any[] = []
+  if (include.comments) {
+    const { data } = await supabase
+      .from('Comment')
+      .select('*')
+      .in('postId', postIds)
+      allComments = data || []
+  }
+
+  return posts.map((p: any) => ({
+    ...p,
+    subreddit: include.subreddit ? subMap.get(p.subredditId) || null : undefined,
+    author: include.author ? authorMap.get(p.authorId) || null : undefined,
+    votes: include.votes ? allVotes.filter((v: any) => v.postId === p.id) : undefined,
+    comments: include.comments ? allComments.filter((c: any) => c.postId === p.id) : undefined,
+  }))
+}
+
 // ── 导出对象 ──────────────────────────────────────────
 
 export const db = {
@@ -99,9 +166,12 @@ export const db = {
       if (opts?.take) query = query.limit(opts.take)
       if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
 
-      const { data, error } = await query
+      const { data: posts, error } = await query
       if (error) throw error
-      return data || []
+      if (!posts?.length) return []
+
+      // Resolve include relations (batch)
+      return resolvePostIncludes(posts, opts?.include)
     },
 
     async findFirst(opts?: {

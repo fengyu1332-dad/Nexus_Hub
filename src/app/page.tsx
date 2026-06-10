@@ -23,18 +23,24 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    const [rawPosts, rawSubreddits] = await Promise.all([
-      db.post.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-        select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
-      }),
-      db.subreddit.findMany({
-        take: 5,
+    const rawPosts = await db.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
+    })
+
+    // Fetch only the subreddits referenced by these posts
+    const subIds = [...new Set((rawPosts || []).map((p: any) => p.subredditId).filter(Boolean))]
+    const subredditMap = new Map<string, any>()
+    if (subIds.length > 0) {
+      const subs = await db.subreddit.findMany({
+        where: { id: { in: subIds } },
         select: { id: true, name: true },
-      }),
-    ])
-    const subredditMap = new Map((rawSubreddits || []).map((s: any) => [s.id, s]))
+      })
+      for (const s of subs || []) {
+        if (s) subredditMap.set(s.id, s)
+      }
+    }
     const authorIds = [...new Set((rawPosts || []).map((p: any) => p.authorId).filter(Boolean))]
 
     const authorMap = new Map()

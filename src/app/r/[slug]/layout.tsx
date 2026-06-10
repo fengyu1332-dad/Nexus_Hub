@@ -23,19 +23,29 @@ const Layout = async ({
   params: { slug: string }
 }) => {
   const dict = getDictionary()
-  const session = await getAuthSession()
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR
+  }
 
-  const subreddit = await db.subreddit.findFirst({
-    where: { name: slug },
-    include: {
-      posts: {
-        include: {
-          author: true,
-          votes: true,
+  let subreddit = null
+  try {
+    subreddit = await db.subreddit.findFirst({
+      where: { name: slug },
+      include: {
+        posts: {
+          include: {
+            author: true,
+            votes: true,
+          },
         },
       },
-    },
-  })
+    })
+  } catch {
+    subreddit = null
+  }
 
   if (!subreddit) return notFound()
 
