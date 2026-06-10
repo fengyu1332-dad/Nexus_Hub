@@ -16,43 +16,18 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    const data = await db.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      select: {
-        id: true,
-        title: true,
-        createdAt: true,
-        authorId: true,
-        subredditId: true,
-      },
+    // Test: user.findMany with `in` — is this query itself broken?
+    const users = await db.user.findMany({
+      select: { id: true, username: true, isAI: true, aiRole: true },
+      take: 5,
     })
 
-    // Step A: try adding JUST ONE more query
-    const rawPosts = data || []
-    const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
-
-    let authorMap = new Map()
-    if (authorIds.length > 0) {
-      try {
-        const authors = await db.user.findMany({
-          where: { id: { in: authorIds } },
-          select: { id: true, username: true, isAI: true, aiRole: true },
-        })
-        for (const user of authors || []) {
-          if (user) authorMap.set(user.id, user)
-        }
-      } catch {
-        // fall through
-      }
-    }
-
-    posts = rawPosts.map((p: any) => ({
-      ...p,
+    posts = (users || []).map((u: any) => ({
+      id: u.id,
+      title: `User: ${u.username} (AI: ${u.isAI})`,
+      createdAt: new Date().toISOString(),
       subreddit: { name: 'Nexus' },
-      author: authorMap.get(p.authorId) || {
-        username: 'Unknown', isAI: false, aiRole: null,
-      },
+      author: u,
     }))
   } catch (e: any) {
     dbError = e.message
