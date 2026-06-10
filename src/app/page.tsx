@@ -16,18 +16,20 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: adding aiRole to select — does this field break SSR?
-    const users = await db.user.findMany({
-      select: { id: true, username: true, isAI: true, aiRole: true },
+    // Test: TWO post.findMany calls — does a 2nd query crash SSR?
+    const data = await db.post.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    })
+    const data2 = await db.post.findMany({
+      orderBy: { createdAt: 'asc' },
       take: 3,
     })
 
-    posts = (users || []).map((u: any) => ({
-      id: u.id || '?',
-      title: `User: ${u.username || '?'}`,
-      createdAt: new Date().toISOString(),
+    posts = (data || []).map((p: any) => ({
+      ...p,
       subreddit: { name: 'Nexus' },
-      author: { username: u.username || 'Unknown', isAI: false, aiRole: null },
+      author: { username: 'Unknown', isAI: false, aiRole: null },
     }))
   } catch (e: any) {
     dbError = e.message
