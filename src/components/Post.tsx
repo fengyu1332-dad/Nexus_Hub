@@ -22,7 +22,7 @@ interface PostProps {
   subredditName: string
   currentVote?: PartialVote
   commentAmt: number
-  savedPostIds?: Set<string>
+  savedPostIds?: string[]
 }
 
 const Post: FC<PostProps> = ({
@@ -105,7 +105,7 @@ const Post: FC<PostProps> = ({
         </Link>
         <BookmarkButton
           postId={post.id}
-          initialSaved={savedPostIds?.has(post.id) ?? false}
+          initialSaved={savedPostIds?.includes(post.id) ?? false}
         />
       </div>
     </div>

@@ -38,7 +38,12 @@ const page = async ({ params, searchParams }: PageProps) => {
   const { slug } = params
   const sort = searchParams.sort || 'new'
 
-  const session = await getAuthSession()
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR on Vercel
+  }
 
   let orderBy: Record<string, string>
   if (sort === 'hot') {
@@ -68,14 +73,14 @@ const page = async ({ params, searchParams }: PageProps) => {
   if (!subreddit) return notFound()
 
   // Fetch bookmarks for current user
-  let savedPostIds: Set<string> | undefined
+  let savedPostIds: string[] = []
   if (session?.user) {
     try {
       const bookmarks = await db.bookmark.findMany({
         where: { userId: session.user.id },
         select: { postId: true },
       })
-      savedPostIds = new Set(bookmarks.map((b: any) => b.postId))
+      savedPostIds = bookmarks.map((b: any) => b.postId)
     } catch {
       // Bookmark table may not exist yet
     }

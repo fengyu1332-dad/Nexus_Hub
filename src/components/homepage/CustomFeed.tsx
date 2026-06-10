@@ -5,7 +5,12 @@ import PostFeed from '../PostFeed'
 import { notFound } from 'next/navigation'
 
 const CustomFeed = async ({ sort }: { sort?: string }) => {
-  const session = await getAuthSession()
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR on Vercel
+  }
 
   // only rendered if session exists, so this will not happen
   if (!session) return notFound()
@@ -47,13 +52,13 @@ const CustomFeed = async ({ sort }: { sort?: string }) => {
   })
 
   // Fetch bookmarks for current user
-  let savedPostIds: Set<string> | undefined
+  let savedPostIds: string[] = []
   try {
     const bookmarks = await db.bookmark.findMany({
       where: { userId: session.user.id },
       select: { postId: true },
     })
-    savedPostIds = new Set(bookmarks.map((b: any) => b.postId))
+    savedPostIds = bookmarks.map((b: any) => b.postId)
   } catch {
     // Bookmark table may not exist yet
   }

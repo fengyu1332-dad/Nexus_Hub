@@ -14,7 +14,7 @@ interface PostFeedProps {
   initialPosts: ExtendedPost[]
   subredditName?: string
   sort?: string
-  savedPostIds?: Set<string>
+  savedPostIds?: string[]
 }
 
 const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName, sort, savedPostIds }) => {

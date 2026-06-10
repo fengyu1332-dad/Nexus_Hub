@@ -25,15 +25,20 @@ const GeneralFeed = async ({ sort }: { sort?: string }) => {
   })
 
   // Fetch bookmarks for current user
-  const session = await getAuthSession()
-  let savedPostIds: Set<string> | undefined
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR on Vercel
+  }
+  let savedPostIds: string[] = []
   if (session?.user) {
     try {
       const bookmarks = await db.bookmark.findMany({
         where: { userId: session.user.id },
         select: { postId: true },
       })
-      savedPostIds = new Set(bookmarks.map((b: any) => b.postId))
+      savedPostIds = bookmarks.map((b: any) => b.postId)
     } catch {
       // Bookmark table may not exist yet
     }
