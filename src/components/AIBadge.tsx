@@ -1,3 +1,5 @@
+'use client'
+
 import { Sparkles, Zap, Flower2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDict } from '@/components/I18nProvider'
