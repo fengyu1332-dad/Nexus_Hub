@@ -2,7 +2,6 @@ import { AIBadge } from '@/components/AIBadge'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import SortSelector from '@/components/SortSelector'
-import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
 import { Home as HomeIcon } from 'lucide-react'
@@ -10,46 +9,16 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: { sort?: string }
-}) {
+export default async function Home() {
   const dict = getDictionary()
   const locale = getLocale()
-  const sort = searchParams.sort || 'new'
   let posts: any[] = []
   let dbError: string | null = null
-  let isPersonalized = false
 
   try {
-    let subscribedIds: string[] = []
-    try {
-      const session = await getAuthSession()
-      if (session?.user) {
-        const subs = await db.subscription.findMany({
-          where: { userId: session.user.id },
-          select: { subredditId: true },
-        })
-        subscribedIds = (subs || []).map((s: any) => s.subredditId)
-        isPersonalized = subscribedIds.length > 0
-      }
-    } catch {
-      // Session/subscription lookup unavailable
-    }
-
-    let orderBy: Record<string, string>
-    if (sort === 'hot') {
-      orderBy = { hotScore: 'desc' }
-    } else if (sort === 'top') {
-      orderBy = { voteCount: 'desc' }
-    } else {
-      orderBy = { createdAt: 'desc' }
-    }
-
     const data = await db.post.findMany({
-      orderBy,
-      take: isPersonalized ? 50 : 20,
+      orderBy: { createdAt: 'desc' },
+      take: 20,
       select: {
         id: true,
         title: true,
@@ -59,18 +28,9 @@ export default async function Home({
       },
     })
 
-    let rawPosts = data || []
-    if (isPersonalized && subscribedIds.length > 0) {
-      const filtered = rawPosts.filter((p: any) =>
-        subscribedIds.includes(p.subredditId)
-      )
-      const general = rawPosts.filter(
-        (p: any) => !subscribedIds.includes(p.subredditId)
-      )
-      rawPosts = [...filtered, ...general].slice(0, 20)
-    }
+    const rawPosts = data || []
 
-    // Parallel batch resolution — avoids sequential await crash on Vercel
+    // Parallel batch resolution
     const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
     const subredditIds = [...new Set(rawPosts.map((p: any) => p.subredditId).filter(Boolean))]
 
@@ -150,15 +110,13 @@ export default async function Home({
           <div className='bg-emerald-100 px-6 py-4'>
             <p className='font-semibold py-3 flex items-center gap-1.5'>
               <HomeIcon className='h-4 w-4' />
-              {isPersonalized ? dict.home.yourFeed : dict.home.home}
+              {dict.home.home}
             </p>
           </div>
           <dl className='-my-3 divide-y divide-gray-100 px-6 py-4 text-sm leading-6'>
             <div className='flex justify-between gap-x-4 py-3'>
               <p className='text-zinc-500'>
-                {isPersonalized
-                  ? dict.home.feedDescription
-                  : dict.home.homeDescription}
+                {dict.home.homeDescription}
               </p>
             </div>
 
