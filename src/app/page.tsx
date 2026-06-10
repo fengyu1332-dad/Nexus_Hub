@@ -28,39 +28,28 @@ export default async function Home() {
       },
     })
 
+    // Step A: try adding JUST ONE more query
     const rawPosts = data || []
-
-    // Batch resolution — 2 queries with `in` filter (avoids N+M conns on Vercel)
     const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
-    const subredditIds = [...new Set(rawPosts.map((p: any) => p.subredditId).filter(Boolean))]
 
-    const [authors, subreddits] = await Promise.all([
-      authorIds.length > 0
-        ? db.user.findMany({
-            where: { id: { in: authorIds } },
-            select: { id: true, username: true, isAI: true, aiRole: true },
-          })
-        : [],
-      subredditIds.length > 0
-        ? db.subreddit.findMany({
-            where: { id: { in: subredditIds } },
-            select: { id: true, name: true },
-          })
-        : [],
-    ])
-
-    const authorMap = new Map()
-    for (const user of authors) {
-      if (user) authorMap.set(user.id, user)
-    }
-    const subredditMap = new Map()
-    for (const sub of subreddits) {
-      if (sub) subredditMap.set(sub.id, sub)
+    let authorMap = new Map()
+    if (authorIds.length > 0) {
+      try {
+        const authors = await db.user.findMany({
+          where: { id: { in: authorIds } },
+          select: { id: true, username: true, isAI: true, aiRole: true },
+        })
+        for (const user of authors || []) {
+          if (user) authorMap.set(user.id, user)
+        }
+      } catch {
+        // fall through
+      }
     }
 
     posts = rawPosts.map((p: any) => ({
       ...p,
-      subreddit: subredditMap.get(p.subredditId) || { name: 'Nexus' },
+      subreddit: { name: 'Nexus' },
       author: authorMap.get(p.authorId) || {
         username: 'Unknown', isAI: false, aiRole: null,
       },
