@@ -41,7 +41,7 @@ export default async function Home() {
     if (authorIds.length > 0) {
       const users = await db.user.findMany({
         where: { id: { in: authorIds } },
-        select: { id: true, username: true, isAI: true, aiRole: true },
+        select: { id: true, username: true, isAI: true },
       })
       for (const u of users || []) {
         if (u) authorMap.set(u.id, u)
@@ -51,7 +51,7 @@ export default async function Home() {
     posts = (rawPosts || []).map((p: any) => ({
       ...p,
       subreddit: subredditMap.get(p.subredditId) || { name: 'Nexus' },
-      author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false, aiRole: null },
+      author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false },
     }))
   } catch (e: any) {
     dbError = e.message
