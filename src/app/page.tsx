@@ -2,7 +2,6 @@ import { AIBadge } from '@/components/AIBadge'
 import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import SortSelector from '@/components/SortSelector'
-import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
 import { Home as HomeIcon } from 'lucide-react'
@@ -20,24 +19,9 @@ export default async function Home({
   const sort = searchParams.sort || 'new'
   let posts: any[] = []
   let dbError: string | null = null
-  let isPersonalized = false
 
   try {
-    const session = await getAuthSession()
-    let subscribedIds: string[] = []
-
-    if (session?.user) {
-      try {
-        const subs = await db.subscription.findMany({
-          where: { userId: session.user.id },
-          select: { subredditId: true },
-        })
-        subscribedIds = (subs || []).map((s: any) => s.subredditId)
-        isPersonalized = subscribedIds.length > 0
-      } catch {
-        // Subscription lookup unavailable — fallback to all posts
-      }
-    }
+    const isPersonalized = false
 
     let orderBy: Record<string, string>
     if (sort === 'hot') {
@@ -50,7 +34,7 @@ export default async function Home({
 
     const data = await db.post.findMany({
       orderBy,
-      take: isPersonalized ? 50 : 20,
+      take: 20,
       select: {
         id: true,
         title: true,
@@ -60,17 +44,7 @@ export default async function Home({
       },
     })
 
-    if (isPersonalized && subscribedIds.length > 0) {
-      const filtered = (data || []).filter((p: any) =>
-        subscribedIds.includes(p.subredditId)
-      )
-      const general = (data || []).filter(
-        (p: any) => !subscribedIds.includes(p.subredditId)
-      )
-      posts = [...filtered, ...general].slice(0, 20)
-    } else {
-      posts = data || []
-    }
+    posts = data || []
 
     const authorIds = [
       ...new Set(posts.map((p: any) => p.authorId).filter(Boolean)),
@@ -148,15 +122,13 @@ export default async function Home({
           <div className='bg-emerald-100 px-6 py-4'>
             <p className='font-semibold py-3 flex items-center gap-1.5'>
               <HomeIcon className='h-4 w-4' />
-              {isPersonalized ? dict.home.yourFeed : dict.home.home}
+              {dict.home.home}
             </p>
           </div>
           <dl className='-my-3 divide-y divide-gray-100 px-6 py-4 text-sm leading-6'>
             <div className='flex justify-between gap-x-4 py-3'>
               <p className='text-zinc-500'>
-                {isPersonalized
-                  ? dict.home.feedDescription
-                  : dict.home.homeDescription}
+                {dict.home.homeDescription}
               </p>
             </div>
 
