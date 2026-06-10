@@ -3,6 +3,7 @@ import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import SortSelector from '@/components/SortSelector'
 import { db } from '@/lib/db'
+import { getAuthSession } from '@/lib/auth'
 import { getDictionary, getLocale } from '@/i18n'
 import { Home as HomeIcon } from 'lucide-react'
 import Link from 'next/link'
@@ -12,6 +13,12 @@ export const dynamic = 'force-dynamic'
 export default async function Home() {
   const dict = getDictionary()
   const locale = getLocale()
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR on Vercel
+  }
   let posts: any[] = []
   let dbError: string | null = null
 
