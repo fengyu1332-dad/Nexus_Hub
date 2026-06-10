@@ -16,12 +16,15 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: user.findMany WITHOUT select (uses '*'), minimal params
-    const users = await db.user.findMany({ take: 3 })
+    // Test: user.findMany WITH simple select — does buildSelect break SSR?
+    const users = await db.user.findMany({
+      select: { id: true, username: true },
+      take: 3,
+    })
 
     posts = (users || []).map((u: any) => ({
       id: u.id || '?',
-      title: `User: ${u.username || '?'} (email: ${u.email || '?'})`,
+      title: `User: ${u.username || '?'}`,
       createdAt: new Date().toISOString(),
       subreddit: { name: 'Nexus' },
       author: { username: u.username || 'Unknown', isAI: false, aiRole: null },
