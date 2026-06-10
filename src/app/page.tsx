@@ -30,27 +30,23 @@ export default async function Home() {
 
     const rawPosts = data || []
 
-    // Parallel batch resolution
+    // Batch resolution — 2 queries with `in` filter (avoids N+M conns on Vercel)
     const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
     const subredditIds = [...new Set(rawPosts.map((p: any) => p.subredditId).filter(Boolean))]
 
     const [authors, subreddits] = await Promise.all([
-      Promise.all(
-        authorIds.map((id) =>
-          db.user.findFirst({
-            where: { id },
+      authorIds.length > 0
+        ? db.user.findMany({
+            where: { id: { in: authorIds } },
             select: { id: true, username: true, isAI: true, aiRole: true },
           })
-        )
-      ),
-      Promise.all(
-        subredditIds.map((id) =>
-          db.subreddit.findFirst({
-            where: { id },
+        : [],
+      subredditIds.length > 0
+        ? db.subreddit.findMany({
+            where: { id: { in: subredditIds } },
             select: { id: true, name: true },
           })
-        )
-      ),
+        : [],
     ])
 
     const authorMap = new Map()

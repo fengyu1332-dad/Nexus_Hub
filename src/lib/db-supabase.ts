@@ -340,6 +340,8 @@ export const db = {
         for (const [col, val] of Object.entries(opts.where)) {
           if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
             query = query.ilike(col, `${(val as any).startsWith}%`)
+          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
           } else {
             query = query.eq(col, val)
           }
@@ -425,6 +427,8 @@ export const db = {
         for (const [col, val] of Object.entries(opts.where)) {
           if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
             query = query.ilike(col, `%${(val as any).contains}%`)
+          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
           } else {
             query = query.eq(col, val)
           }
