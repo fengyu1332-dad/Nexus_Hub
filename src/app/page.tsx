@@ -16,11 +16,9 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    const orderBy = { createdAt: 'desc' }
-
     const data = await db.post.findMany({
-      orderBy,
-      take: 20,
+      orderBy: { createdAt: 'desc' },
+      take: 5,
       select: {
         id: true,
         title: true,
@@ -29,43 +27,11 @@ export default async function Home() {
         subredditId: true,
       },
     })
-
-    posts = data || []
-
-    const authorIds = [
-      ...new Set(posts.map((p: any) => p.authorId).filter(Boolean)),
-    ]
-    const subredditIds = [
-      ...new Set(posts.map((p: any) => p.subredditId).filter(Boolean)),
-    ]
-
-    const authorMap = new Map()
-    const subredditMap = new Map()
-    for (const id of authorIds) {
-      const user = await db.user.findFirst({
-        where: { id },
-        select: { id: true, username: true, isAI: true, aiRole: true },
-      })
-      if (user) authorMap.set(id, user)
-    }
-    for (const id of subredditIds) {
-      const sub = await db.subreddit.findFirst({
-        where: { id },
-        select: { id: true, name: true },
-      })
-      if (sub) subredditMap.set(id, sub)
-    }
-
-    posts = posts.map((p: any) => ({
+    // No batch resolution — inline fallback values
+    posts = (data || []).map((p: any) => ({
       ...p,
-      subreddit:
-        subredditMap.get(p.subredditId) || { name: 'Nexus' },
-      author:
-        authorMap.get(p.authorId) || {
-          username: 'Unknown',
-          isAI: false,
-          aiRole: null,
-        },
+      subreddit: { name: 'Nexus' },
+      author: { username: 'Unknown', isAI: false, aiRole: null },
     }))
   } catch (e: any) {
     dbError = e.message
