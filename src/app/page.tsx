@@ -16,18 +16,15 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: user.findMany with `in` — is this query itself broken?
-    const users = await db.user.findMany({
-      select: { id: true, username: true, isAI: true, aiRole: true },
-      take: 5,
-    })
+    // Test: user.findMany WITHOUT select (uses '*'), minimal params
+    const users = await db.user.findMany({ take: 3 })
 
     posts = (users || []).map((u: any) => ({
-      id: u.id,
-      title: `User: ${u.username} (AI: ${u.isAI})`,
+      id: u.id || '?',
+      title: `User: ${u.username || '?'} (email: ${u.email || '?'})`,
       createdAt: new Date().toISOString(),
       subreddit: { name: 'Nexus' },
-      author: u,
+      author: { username: u.username || 'Unknown', isAI: false, aiRole: null },
     }))
   } catch (e: any) {
     dbError = e.message
