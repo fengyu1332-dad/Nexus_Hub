@@ -23,7 +23,6 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: Promise.all with post + subreddit queries
     const [rawPosts, rawSubreddits] = await Promise.all([
       db.post.findMany({
         orderBy: { createdAt: 'desc' },
@@ -42,7 +41,7 @@ export default async function Home() {
     if (authorIds.length > 0) {
       const users = await db.user.findMany({
         where: { id: { in: authorIds } },
-        select: { id: true, username: true },
+        select: { id: true, username: true, isAI: true, aiRole: true },
       })
       for (const u of users || []) {
         if (u) authorMap.set(u.id, u)
