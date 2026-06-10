@@ -23,14 +23,20 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: full flow — get posts, extract authorIds, query users with in
-    const data = await db.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
-    })
-    const rawPosts = data || []
-    const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
+    // Test: Promise.all with post + subreddit queries
+    const [rawPosts, rawSubreddits] = await Promise.all([
+      db.post.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
+      }),
+      db.subreddit.findMany({
+        take: 5,
+        select: { id: true, name: true },
+      }),
+    ])
+    const subredditMap = new Map((rawSubreddits || []).map((s: any) => [s.id, s]))
+    const authorIds = [...new Set((rawPosts || []).map((p: any) => p.authorId).filter(Boolean))]
 
     const authorMap = new Map()
     if (authorIds.length > 0) {
@@ -43,9 +49,9 @@ export default async function Home() {
       }
     }
 
-    posts = rawPosts.map((p: any) => ({
+    posts = (rawPosts || []).map((p: any) => ({
       ...p,
-      subreddit: { name: 'Nexus' },
+      subreddit: subredditMap.get(p.subredditId) || { name: 'Nexus' },
       author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false, aiRole: null },
     }))
   } catch (e: any) {
