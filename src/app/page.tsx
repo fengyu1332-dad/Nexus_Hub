@@ -16,9 +16,9 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: user.findMany WITH simple select — does buildSelect break SSR?
+    // Test: adding isAI to select — does this field break SSR?
     const users = await db.user.findMany({
-      select: { id: true, username: true },
+      select: { id: true, username: true, isAI: true },
       take: 3,
     })
 
