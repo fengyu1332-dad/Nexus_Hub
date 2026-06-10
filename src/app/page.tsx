@@ -6,30 +6,17 @@ import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
 import { Home as HomeIcon } from 'lucide-react'
 import Link from 'next/link'
-import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: { sort?: string }
-}) {
+export default async function Home() {
   const dict = getDictionary()
   const locale = getLocale()
-  const sort = searchParams.sort || 'new'
   let posts: any[] = []
   let dbError: string | null = null
 
   try {
-    let orderBy: Record<string, string>
-    if (sort === 'hot') {
-      orderBy = { hotScore: 'desc' }
-    } else if (sort === 'top') {
-      orderBy = { voteCount: 'desc' }
-    } else {
-      orderBy = { createdAt: 'desc' }
-    }
+    const orderBy = { createdAt: 'desc' }
 
     const data = await db.post.findMany({
       orderBy,
@@ -89,9 +76,7 @@ export default async function Home({
       <h1 className='font-bold text-3xl md:text-4xl'>{dict.home.nexusHub}</h1>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-y-4 md:gap-x-4 py-6'>
         <div className='col-span-2 space-y-4'>
-          <Suspense fallback={null}>
-            <SortSelector />
-          </Suspense>
+          <SortSelector />
           {dbError ? (
             <div className='p-4 bg-red-50 rounded border border-red-200'>
               <p className='font-semibold text-red-700'>{dict.home.dbError}</p>
