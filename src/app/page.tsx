@@ -16,9 +16,9 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: adding isAI to select — does this field break SSR?
+    // Test: adding aiRole to select — does this field break SSR?
     const users = await db.user.findMany({
-      select: { id: true, username: true, isAI: true },
+      select: { id: true, username: true, isAI: true, aiRole: true },
       take: 3,
     })
 
