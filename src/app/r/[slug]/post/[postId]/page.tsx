@@ -116,21 +116,30 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
   let post: (Post & { votes: Vote[]; author: User }) | null = null
 
   if (!cachedPost) {
-    post = await db.post.findFirst({
-      where: {
-        id: params.postId,
-      },
-      include: {
-        votes: true,
-        author: true,
-      },
-    })
+    try {
+      post = await db.post.findFirst({
+        where: {
+          id: params.postId,
+        },
+        include: {
+          votes: true,
+          author: true,
+        },
+      })
+    } catch {
+      // findFirst may fail
+    }
   }
 
   if (!post && !cachedPost) return notFound()
 
   // Check if current user has bookmarked this post
-  const session = await getAuthSession()
+  let session = null
+  try {
+    session = await getAuthSession()
+  } catch {
+    // getAuthSession may fail during SSR on Vercel
+  }
   let isSaved = false
   if (session?.user) {
     try {
