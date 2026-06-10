@@ -16,14 +16,15 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: TWO post.findMany calls — does a 2nd query crash SSR?
+    // Test: post.findMany + user.findMany with `in` — is `where in` on User broken?
     const data = await db.post.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
     })
-    const data2 = await db.post.findMany({
-      orderBy: { createdAt: 'asc' },
-      take: 3,
+    // Use a dummy in-query — this exercises the `in` code path on user.findMany
+    const dummyUsers = await db.user.findMany({
+      where: { id: { in: ['__nonexistent__'] } },
+      select: { id: true },
     })
 
     posts = (data || []).map((p: any) => ({
