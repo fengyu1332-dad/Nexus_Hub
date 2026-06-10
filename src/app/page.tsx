@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { getDictionary } from '@/i18n'
+import { NewsletterSignup } from '@/components/NewsletterSignup'
 import SortSelector from '@/components/SortSelector'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,9 @@ export default async function Home() {
           ))}
         </ul>
       )}
+      <div className='mt-8'>
+        <NewsletterSignup />
+      </div>
     </div>
   )
 }
