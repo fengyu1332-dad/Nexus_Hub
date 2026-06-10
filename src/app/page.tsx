@@ -16,21 +16,30 @@ export default async function Home() {
   let dbError: string | null = null
 
   try {
-    // Test: post.findMany + user.findMany with `in` — is `where in` on User broken?
+    // Test: full flow — get posts, extract authorIds, query users with in
     const data = await db.post.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
+      select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
     })
-    // Use a dummy in-query — this exercises the `in` code path on user.findMany
-    const dummyUsers = await db.user.findMany({
-      where: { id: { in: ['__nonexistent__'] } },
-      select: { id: true },
-    })
+    const rawPosts = data || []
+    const authorIds = [...new Set(rawPosts.map((p: any) => p.authorId).filter(Boolean))]
 
-    posts = (data || []).map((p: any) => ({
+    const authorMap = new Map()
+    if (authorIds.length > 0) {
+      const users = await db.user.findMany({
+        where: { id: { in: authorIds } },
+        select: { id: true, username: true },
+      })
+      for (const u of users || []) {
+        if (u) authorMap.set(u.id, u)
+      }
+    }
+
+    posts = rawPosts.map((p: any) => ({
       ...p,
       subreddit: { name: 'Nexus' },
-      author: { username: 'Unknown', isAI: false, aiRole: null },
+      author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false, aiRole: null },
     }))
   } catch (e: any) {
     dbError = e.message
