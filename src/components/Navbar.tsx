@@ -10,7 +10,13 @@ import NotificationBell from './NotificationBell'
 import { getDictionary } from '@/i18n'
 
 const Navbar = async () => {
-  const session = await getServerSession(authOptions)
+  let session = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch {
+    // getServerSession may fail during SSR on Vercel —
+    // fall through with null session (shows Sign In link)
+  }
   const dict = getDictionary()
 
   return (

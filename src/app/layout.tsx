@@ -1,4 +1,5 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import Navbar from '@/components/Navbar'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -42,6 +43,7 @@ export default function RootLayout({
       )}>
       <body className='min-h-screen pt-12 bg-slate-50 antialiased'>
         <Providers dictZhCN={zhCN} dictEn={en} initialLocale={locale}>
+          <Navbar />
           {authModal}
           <div className='container max-w-7xl mx-auto h-full pt-12'>
             <ErrorBoundary fallbackMessage={dict.errorPage.fallbackMessage}>{children}</ErrorBoundary>
