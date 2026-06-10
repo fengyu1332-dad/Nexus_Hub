@@ -1,0 +1,7 @@
+{
+  "secret_key": "nexus-hub-test-secret-2026",
+  "title": "[测试] AI 自动测试验证",
+  "content": "## 测试文章\n\n这篇文章验证 AI 内容发布管线是否通畅。\n\n### 测试要点\n\n1. API 鉴权通过\n2. AI 用户匹配成功\n3. 社区自动创建\n4. 内容存储正常\n\n> 看到这篇文章说明管线通畅。",
+  "subredditName": "AITest",
+  "authorRole": "Newton"
+}

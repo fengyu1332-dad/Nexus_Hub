@@ -16,7 +16,8 @@ export async function POST(req: Request) {
     const { title, content, subredditName, authorRole } =
       AIPublishValidator.parse(body)
 
-    // ── 2. 查找/创建对应的 Subreddit ──────────────────────────
+    // ── 2. 查找 AI 用户 ──────────────────────────────────────
+    console.log('[ai-publish] Looking for AI user:', authorRole)
     const aiAuthor = await db.user.findFirst({
       where: { aiRole: authorRole, isAI: true },
     })
@@ -26,39 +27,42 @@ export async function POST(req: Request) {
         { status: 500 }
       )
     }
+    console.log('[ai-publish] Found AI user:', (aiAuthor as any).id)
 
+    // ── 3. 查找/创建 Subreddit ──────────────────────────────
+    console.log('[ai-publish] Looking for subreddit:', subredditName)
     let subreddit = await db.subreddit.findFirst({
       where: { name: subredditName },
     })
     if (!subreddit) {
+      console.log('[ai-publish] Creating subreddit:', subredditName)
       subreddit = await db.subreddit.create({
         data: {
           name: subredditName,
-          creatorId: aiAuthor.id,
+          creatorId: (aiAuthor as any).id,
         },
       })
     }
 
-    // ── 3. 调用 Prisma 创建 Post 记录 ─────────────────────────
+    // ── 4. 创建 Post ──────────────────────────────────────
+    console.log('[ai-publish] Converting markdown...')
     const editorContent = markdownToEditorJS(content)
-
+    console.log('[ai-publish] Creating post...')
     const post = await db.post.create({
       data: {
         title,
-        // Prisma Json field needs explicit any cast
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      content: editorContent as any,
-        authorId: aiAuthor.id,
-        subredditId: subreddit.id,
+        content: editorContent as any,
+        authorId: (aiAuthor as any).id,
+        subredditId: (subreddit as any).id,
       },
     })
 
-    // ── 4. 返回 200 成功状态 ─────────────────────────────────
+    console.log('[ai-publish] Success:', (post as any).id)
     return new Response(
       JSON.stringify({
-        id: post.id,
-        subredditName: subreddit.name,
-        authorRole: aiAuthor.aiRole,
+        id: (post as any).id,
+        subredditName: (subreddit as any).name,
+        authorRole: (aiAuthor as any).aiRole,
       }),
       {
         status: 200,
@@ -70,7 +74,10 @@ export async function POST(req: Request) {
       return new Response(error.message, { status: 400 })
     }
 
-    console.error('[ai-publish] Unexpected error:', error instanceof Error ? error.message : String(error))
-    return new Response('Could not create AI post at this time', { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    const stack = error instanceof Error ? error.stack : ''
+    console.error('[ai-publish] ERROR:', msg)
+    console.error('[ai-publish] STACK:', stack?.substring(0, 800))
+    return new Response(`Could not create AI post: ${msg}`, { status: 500 })
   }
 }
