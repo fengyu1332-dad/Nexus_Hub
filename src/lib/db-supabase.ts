@@ -636,6 +636,61 @@ export const db = {
   },
 
   // ═══════════════════════════════════════════════════
+  //  CommentVote
+  // ═══════════════════════════════════════════════════
+
+  commentVote: {
+    async findFirst(opts: { where: { userId: string; commentId: string } }) {
+      const { data, error } = await supabase
+        .from('CommentVote')
+        .select('*')
+        .eq('userId', opts.where.userId)
+        .eq('commentId', opts.where.commentId)
+        .limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('CommentVote')
+        .insert(opts.data)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: {
+      where: { userId_commentId: { userId: string; commentId: string } }
+      data: Record<string, unknown>
+    }) {
+      const { userId, commentId } = opts.where.userId_commentId
+      const { data, error } = await supabase
+        .from('CommentVote')
+        .update(opts.data)
+        .eq('userId', userId)
+        .eq('commentId', commentId)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async delete(opts: {
+      where: { userId_commentId: { userId: string; commentId: string } }
+    }) {
+      const { userId, commentId } = opts.where.userId_commentId
+      const { error } = await supabase
+        .from('CommentVote')
+        .delete()
+        .eq('userId', userId)
+        .eq('commentId', commentId)
+      if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
   //  Comment
   // ═══════════════════════════════════════════════════
 

@@ -15,7 +15,7 @@
  */
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3008'
-const SECRET = 'nexus-hub-test-secret-2026'
+const SECRET = process.env.AI_WEBHOOK_SECRET || 'YOUR_WEBHOOK_SECRET_HERE'
 
 // ── 工具函数 ─────────────────────────────────────────────
 
