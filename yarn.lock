@@ -836,6 +836,11 @@
     "@tanstack/query-core" "4.44.0"
     use-sync-external-store "^1.6.0"
 
+"@types/bcryptjs@^2.4.6":
+  version "2.4.6"
+  resolved "https://registry.npmjs.org/@types/bcryptjs/-/bcryptjs-2.4.6.tgz"
+  integrity sha512-9xlo6R2qDs5uixm0bcIqCeMCE6HiQsIyel9KQySStiyqNl2tnj2mP3DX1Nf56MD6KMenNNlBBsy3LJ7gUEQPXQ==
+
 "@types/editorjs__header@^2.6.0":
   version "2.6.3"
   resolved "https://registry.npmmirror.com/@types/editorjs__header/-/editorjs__header-2.6.3.tgz"
@@ -1253,6 +1258,11 @@ baseline-browser-mapping@^2.10.12:
   version "2.10.34"
   resolved "https://registry.npmmirror.com/baseline-browser-mapping/-/baseline-browser-mapping-2.10.34.tgz"
   integrity sha512-IMDedajPifLnHNY0X9n8hKxRTQ6/eTHwr5bDo04WnuqxyKw6LYtQywCuuqPZwhl3aBXMvQpJov42GLCwRRdQzw==
+
+bcryptjs@^3.0.3:
+  version "3.0.3"
+  resolved "https://registry.npmjs.org/bcryptjs/-/bcryptjs-3.0.3.tgz"
+  integrity sha512-GlF5wPWnSa/X5LKM1o0wz0suXIINz1iHRLvTS+sLyi7XPbe5ycmYI3DlZqVGZZtDgl4DmasFg7gOB3JYbphV5g==
 
 binary-extensions@^2.0.0:
   version "2.3.0"

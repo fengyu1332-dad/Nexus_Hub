@@ -15,7 +15,7 @@ const SignIn = () => {
           {dict.auth.termsConsent}
         </p>
       </div>
-      <UserAuthForm />
+      <UserAuthForm showCredentials />
       <p className='px-8 text-center text-sm text-muted-foreground'>
         {dict.auth.newToSite}{' '}
         <Link

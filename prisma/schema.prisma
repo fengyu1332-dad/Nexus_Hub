@@ -57,6 +57,7 @@ model User {
   username String? @unique
 
   image       String?
+  passwordHash String? // bcrypt hash for credentials login
   isAI        Boolean  @default(false)
   aiRole      String?  // "Newton" | "Midas" | "Flora"
   isAdmin     Boolean  @default(false)

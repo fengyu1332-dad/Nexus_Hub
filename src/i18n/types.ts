@@ -36,6 +36,12 @@ export interface Dictionary {
     alreadyMember: string
     home: string
     google: string
+    github: string
+    wechat: string
+    orEmail: string
+    emailPlaceholder: string
+    passwordPlaceholder: string
+    usernamePlaceholder: string
   }
   user: {
     feed: string
@@ -161,6 +167,9 @@ export interface Dictionary {
     usernameNotUpdated: string
     usernameUpdated: string
     googleLoginError: string
+    invalidCredentials: string
+    registered: string
+    registeredDescription: string
     invalidSubredditName: string
     chooseValidName: string
     subredditExists: string

@@ -1,5 +1,8 @@
 import { NextAuthOptions, getServerSession } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
+import GitHubProvider from 'next-auth/providers/github'
+import CredentialsProvider from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 
 export const authOptions: NextAuthOptions = {
@@ -14,12 +17,77 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
+      ? [
+          GitHubProvider({
+            clientId: process.env.GITHUB_CLIENT_ID,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET,
+          }),
+        ]
+      : []),
+    ...(process.env.WECHAT_APP_ID && process.env.WECHAT_APP_SECRET
+      ? [
+          {
+            id: 'wechat',
+            name: 'WeChat',
+            type: 'oauth' as const,
+            authorization: `https://open.weixin.qq.com/connect/qrconnect?appid=${process.env.WECHAT_APP_ID}&scope=snsapi_login#wechat_redirect`,
+            token: {
+              url: 'https://api.weixin.qq.com/sns/oauth2/access_token',
+              async request(context: any) {
+                const url = `https://api.weixin.qq.com/sns/oauth2/access_token?appid=${context.provider.clientId}&secret=${context.provider.clientSecret}&code=${context.params.code}&grant_type=authorization_code`
+                const res = await fetch(url)
+                const json = await res.json()
+                return { tokens: json }
+              },
+            },
+            userinfo: {
+              url: 'https://api.weixin.qq.com/sns/userinfo',
+              async request({ tokens }: any) {
+                const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${tokens.access_token}&openid=${tokens.openid}&lang=zh_CN`
+                const res = await fetch(url)
+                return await res.json()
+              },
+            },
+            profile(profile: any) {
+              return {
+                id: profile.unionid ?? profile.openid,
+                name: profile.nickname,
+                image: profile.headimgurl,
+              }
+            },
+            clientId: process.env.WECHAT_APP_ID,
+            clientSecret: process.env.WECHAT_APP_SECRET,
+          } as any,
+        ]
+      : []),
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+        const user = (await db.user.findFirst({
+          where: { email: credentials.email },
+        })) as any
+        if (!user || !user.passwordHash) return null
+        const valid = await bcrypt.compare(credentials.password, user.passwordHash)
+        if (!valid) return null
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? user.username ?? '',
+          image: user.image ?? '',
+        }
+      },
+    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === 'google') {
+      if (account?.provider === 'google' || account?.provider === 'github' || account?.provider === 'wechat') {
         try {
-          // 查找或创建用户记录
           let dbUser = await db.user.findFirst({
             where: { email: user.email! },
             select: { id: true, isAdmin: true, username: true },
@@ -35,13 +103,12 @@ export const authOptions: NextAuthOptions = {
               },
             })
           }
-          // 将数据库 ID 挂到 profile 上，供 jwt 回调使用
           ;(user as any).dbId = (dbUser as any).id
           ;(user as any).dbIsAdmin = (dbUser as any).isAdmin ?? false
           ;(user as any).dbUsername = (dbUser as any).username
         } catch (e) {
           console.error('[auth] signIn callback error:', e instanceof Error ? e.message : String(e))
-          return true // 即使 DB 失败也允许登录，降级
+          return true
         }
       }
       return true
