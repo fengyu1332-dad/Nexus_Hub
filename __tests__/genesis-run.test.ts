@@ -117,7 +117,6 @@ const CONFLICTING_NEWS = {
 function testSherlockPromptStructure() {
   console.log('\n── A1: Sherlock Prompt 结构验证 ──\n')
 
-  // 验证 n8n workflow 中 Sherlock 的 Prompt 是否包含关键检测词
   const checks = [
     { kw: '数值幻觉', desc: 'Prompt 是否包含"数值幻觉"检测指令' },
     { kw: '名称幻觉', desc: 'Prompt 是否包含"名称幻觉"检测指令' },
@@ -126,61 +125,55 @@ function testSherlockPromptStructure() {
     { kw: 'temperature', desc: '是否将 temperature 设为 0（确定性判断）' },
   ]
 
-  // 读取本地 Sherlock 工作流 JSON
   const fs = require('fs')
   const path = require('path')
-  const sherlockJson = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, '..', 'n8n-workflows', 'nexus-sherlock-factcheck.json'),
-      'utf-8'
-    )
-  )
 
-  const sherlockPromptNode = sherlockJson.nodes.find(
-    (n: any) => n.name?.includes('核查 Prompt') || n.name?.includes('Sherlock Prompt')
-  )
-  const sherlockCodeNode = sherlockJson.nodes.find(
-    (n: any) => n.name?.includes('核查 Prompt') || n.name?.includes('Sherlock Prompt')
-  ) || sherlockJson.nodes.find(
-    (n: any) =>
-      n.parameters?.jsCode?.includes('Sherlock') ||
-      n.parameters?.jsCode?.includes('事实核查')
-  )
+  function runChecksOnCode(code: string, source: string) {
+    if (!code) return false
+    let foundAny = false
+    for (const check of checks) {
+      const found = code.includes(check.kw) || code.toLowerCase().includes(check.kw.toLowerCase())
+      if (found) foundAny = true
+      // Only record if not already passed from another source
+      const existing = results.find(r => r.name === check.desc)
+      if (existing) continue
+      record(check.desc, found, found ? `${source}: 已包含` : `Prompt 中缺少该检测指令`, 'critical')
+    }
+    return foundAny
+  }
 
-  if (!sherlockCodeNode) {
-    // Try to find any code node with temperature 0
-    for (const node of sherlockJson.nodes) {
-      if (node.parameters?.jsCode?.includes('temperature')) {
-        const code = node.parameters.jsCode
-        for (const check of checks) {
-          const found = code.includes(check.kw) || code.toLowerCase().includes(check.kw.toLowerCase())
-          record(check.desc, found, found ? '' : 'Prompt 中缺少该检测指令', 'critical')
-        }
+  // 1. Check standalone Sherlock workflow
+  const sherlockPath = path.join(__dirname, '..', 'n8n-workflows', 'nexus-sherlock-factcheck.json')
+  if (fs.existsSync(sherlockPath)) {
+    const sherlockJson = JSON.parse(fs.readFileSync(sherlockPath, 'utf-8'))
+    // Search for any node containing fact-check prompt code
+    for (const node of sherlockJson.nodes || []) {
+      const code = node.parameters?.jsCode || node.parameters?.text || node.parameters?.prompt || ''
+      if (code && (code.includes('Sherlock') || code.includes('事实核查') || code.includes('幻觉'))) {
+        runChecksOnCode(code, 'Sherlock 独立工作流')
         break
       }
     }
   }
 
-  // Also check the master pipeline's Sherlock section
-  const masterJson = JSON.parse(
-    fs.readFileSync(
-      path.join(__dirname, '..', 'n8n-workflows', 'nexus-master-pipeline.json'),
-      'utf-8'
-    )
-  )
-  const masterSherlockNode = masterJson.nodes.find(
-    (n: any) => n.name?.includes('Sherlock Prompt')
-  )
-  if (masterSherlockNode?.parameters?.jsCode) {
-    const code = masterSherlockNode.parameters.jsCode
-    for (const check of checks) {
-      const found = code.includes(check.kw) || code.toLowerCase().includes(check.kw.toLowerCase())
-      if (!found) {
-        // Check if any previous result already passed this — if so, skip
-        const existing = results.find(r => r.name === check.desc)
-        if (existing) continue
+  // 2. Check master pipeline's Sherlock section
+  const masterPath = path.join(__dirname, '..', 'n8n-workflows', 'nexus-master-pipeline.json')
+  if (fs.existsSync(masterPath)) {
+    const masterJson = JSON.parse(fs.readFileSync(masterPath, 'utf-8'))
+    for (const node of masterJson.nodes || []) {
+      if (node.name?.includes('Sherlock')) {
+        const code = node.parameters?.jsCode || node.parameters?.text || node.parameters?.prompt || ''
+        runChecksOnCode(code, 'Master Pipeline Sherlock 节点')
+        break
       }
-      record(check.desc, found, found ? '' : `Sherlock Prompt 中缺少 ${check.kw}`, 'critical')
+    }
+  }
+
+  // Record any checks that didn't run at all
+  for (const check of checks) {
+    const existing = results.find(r => r.name === check.desc)
+    if (!existing) {
+      record(check.desc, false, '未找到 Sherlock Prompt 节点（工作流文件可能尚未导入）', 'high')
     }
   }
 }

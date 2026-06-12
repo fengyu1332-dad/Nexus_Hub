@@ -219,6 +219,8 @@ export interface Dictionary {
     users: string
     posts: string
     aiAgents: string
+    aiDashboard: string
+    intelSources: string
     systemStatus: string
     totalUsers: string
     totalPosts: string
@@ -236,5 +238,45 @@ export interface Dictionary {
     uptime: string
     healthy: string
     unhealthy: string
+    workflowActive: string
+    workflowInactive: string
+    executeNow: string
+    lastExecution: string
+    successRate: string
+    activate: string
+    deactivate: string
+    testCrawl: string
+    preview: string
+    save: string
+    crawlInterval: string
+    category: string
+    priority: string
+    type: string
+    rss: string
+    webpage: string
+    contentSelector: string
+    crawlLogs: string
+    noLogs: string
+    circuitBreaker: string
+    resetCircuitBreaker: string
+    duration: string
+    contentLength: string
+    pipelineConfig: string
+    globalCrawlInterval: string
+    minutes: string
+    nightQuietHours: string
+    enabled: string
+    disabled: string
+    lastCrawl: string
+    articleCount: string
+    crawlCount: string
+    testResult: string
+    addSource: string
+    editSource: string
+    url: string
+    n8n: string
+    articles: string
+    executions: string
+    noExecutions: string
   }
 }

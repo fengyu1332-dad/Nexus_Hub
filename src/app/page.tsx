@@ -5,10 +5,16 @@ import SortSelector from '@/components/SortSelector'
 import { db } from '@/lib/db'
 import { getAuthSession } from '@/lib/auth'
 import { getDictionary, getLocale } from '@/i18n'
+import type { DbPost, DbUser, DbSubreddit } from '@/lib/types'
 import { Home as HomeIcon } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
+
+type PostSummary = Pick<DbPost, 'id' | 'title' | 'createdAt' | 'authorId' | 'subredditId'> & {
+  author: Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>
+  subreddit: Pick<DbSubreddit, 'id' | 'name'>
+}
 
 export default async function Home() {
   const dict = getDictionary()
@@ -19,7 +25,7 @@ export default async function Home() {
   } catch {
     // getAuthSession may fail during SSR on Vercel
   }
-  let posts: any[] = []
+  let posts: PostSummary[] = []
   let dbError: string | null = null
 
   try {
@@ -27,40 +33,39 @@ export default async function Home() {
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
-    })
+    }) as Pick<PostSummary, 'id' | 'title' | 'createdAt' | 'authorId' | 'subredditId'>[]
 
-    // Fetch only the subreddits referenced by these posts
-    const subIds = [...new Set((rawPosts || []).map((p: any) => p.subredditId).filter(Boolean))]
-    const subredditMap = new Map<string, any>()
+    const subIds = [...new Set((rawPosts || []).map(p => p.subredditId).filter(Boolean))]
+    const subredditMap = new Map<string, Pick<DbSubreddit, 'id' | 'name'>>()
     if (subIds.length > 0) {
       const subs = await db.subreddit.findMany({
         where: { id: { in: subIds } },
         select: { id: true, name: true },
       })
       for (const s of subs || []) {
-        if (s) subredditMap.set(s.id, s)
+        if (s) subredditMap.set(s.id, s as Pick<DbSubreddit, 'id' | 'name'>)
       }
     }
-    const authorIds = [...new Set((rawPosts || []).map((p: any) => p.authorId).filter(Boolean))]
 
-    const authorMap = new Map()
+    const authorIds = [...new Set((rawPosts || []).map(p => p.authorId).filter(Boolean))]
+    const authorMap = new Map<string, Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>>()
     if (authorIds.length > 0) {
       const users = await db.user.findMany({
         where: { id: { in: authorIds } },
         select: { id: true, username: true, isAI: true, aiRole: true },
       })
       for (const u of users || []) {
-        if (u) authorMap.set(u.id, u)
+        if (u) authorMap.set(u.id, u as Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>)
       }
     }
 
-    posts = (rawPosts || []).map((p: any) => ({
+    posts = (rawPosts || []).map(p => ({
       ...p,
-      subreddit: subredditMap.get(p.subredditId) || { name: 'Nexus' },
-      author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false, aiRole: null },
-    }))
-  } catch (e: any) {
-    dbError = e.message
+      subreddit: subredditMap.get(p.subredditId) || { id: '', name: 'Nexus' },
+      author: authorMap.get(p.authorId) || { id: '', username: 'Unknown', isAI: false, aiRole: null },
+    })) as PostSummary[]
+  } catch (e: unknown) {
+    dbError = e instanceof Error ? e.message : String(e)
   }
 
   return (

@@ -65,31 +65,33 @@ async function resolvePostIncludes(
 
   const postIds = posts.map((p: any) => p.id)
 
-  // Collect unique subreddit IDs
+  // Collect unique subreddit IDs — batch with `in`
   const subMap = new Map<string, any>()
   if (include.subreddit) {
     const subIds = [...new Set(posts.map((p: any) => p.subredditId).filter(Boolean))]
-    for (const sid of subIds) {
-      const { data } = await supabase
+    if (subIds.length > 0) {
+      const { data: subs } = await supabase
         .from('Subreddit')
         .select('*')
-        .eq('id', sid)
-        .limit(1)
-      if (data?.[0]) subMap.set(sid, data[0])
+        .in('id', subIds)
+      for (const s of subs || []) {
+        if (s) subMap.set(s.id, s)
+      }
     }
   }
 
-  // Collect unique author IDs
+  // Collect unique author IDs — batch with `in`
   const authorMap = new Map<string, any>()
   if (include.author) {
     const authorIds = [...new Set(posts.map((p: any) => p.authorId).filter(Boolean))]
-    for (const aid of authorIds) {
-      const { data } = await supabase
+    if (authorIds.length > 0) {
+      const { data: users } = await supabase
         .from('User')
         .select('*')
-        .eq('id', aid)
-        .limit(1)
-      if (data?.[0]) authorMap.set(aid, data[0])
+        .in('id', authorIds)
+      for (const u of users || []) {
+        if (u) authorMap.set(u.id, u)
+      }
     }
   }
 
@@ -367,7 +369,7 @@ export const db = {
         }
         const { data: posts } = await postQuery
 
-        // Batch-resolve post authors
+        // Batch-resolve post authors with single `in` query
         const authorIds = [
           ...new Set(
             (posts || [])
@@ -376,13 +378,14 @@ export const db = {
           ),
         ]
         const authorMap = new Map()
-        for (const aid of authorIds) {
-          const { data: userData } = await supabase
+        if (authorIds.length > 0) {
+          const { data: usersData } = await supabase
             .from('User')
             .select('id,username,isAI,aiRole')
-            .eq('id', aid)
-            .limit(1)
-          if (userData?.[0]) authorMap.set(aid, userData[0])
+            .in('id', authorIds)
+          for (const u of usersData || []) {
+            if (u) authorMap.set(u.id, u)
+          }
         }
 
         result.posts = (posts || []).map((p: any) => ({
@@ -849,17 +852,18 @@ export const db = {
       const { data, error } = await query
       if (error) throw error
 
-      // Resolve include.fromUser
+      // Resolve include.fromUser — batch with single `in` query
       if (opts?.include?.fromUser && data) {
         const userIds = [...new Set(data.map((n: any) => n.fromUserId))]
         const userMap = new Map()
-        for (const uid of userIds) {
-          const { data: u } = await supabase
+        if (userIds.length > 0) {
+          const { data: users } = await supabase
             .from('User')
             .select('username,image')
-            .eq('id', uid)
-            .limit(1)
-          if (u?.[0]) userMap.set(uid, u[0])
+            .in('id', userIds)
+          for (const u of users || []) {
+            if (u) userMap.set(u.id, u)
+          }
         }
         return data.map((n: any) => ({
           ...n,
@@ -981,6 +985,223 @@ export const db = {
         .eq('userId', userId)
         .eq('postId', postId)
       if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  IntelSource — 情报源管理
+  // ═══════════════════════════════════════════════════
+
+  intelSource: {
+    async findMany(opts?: {
+      where?: Filter
+      orderBy?: OrderBy
+      take?: number
+      skip?: number
+    }) {
+      let query = supabase.from('IntelSource').select('*')
+
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+
+      if (opts?.take) query = query.limit(opts.take)
+      if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async findFirst(opts: { where: Filter }) {
+      let query = supabase.from('IntelSource').select('*')
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, updatedAt: now, ...opts.data }
+      const { data, error } = await supabase
+        .from('IntelSource')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: {
+      where: { id: string }
+      data: Record<string, unknown>
+    }) {
+      const { data, error } = await supabase
+        .from('IntelSource')
+        .update({ ...opts.data, updatedAt: new Date().toISOString() })
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async delete(opts: { where: { id: string } }) {
+      const { error } = await supabase
+        .from('IntelSource')
+        .delete()
+        .eq('id', opts.where.id)
+      if (error) throw error
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('IntelSource')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  CrawlLog — 采集日志
+  // ═══════════════════════════════════════════════════
+
+  crawlLog: {
+    async findMany(opts?: {
+      where?: Filter
+      orderBy?: OrderBy
+      take?: number
+      skip?: number
+    }) {
+      let query = supabase.from('CrawlLog').select('*')
+
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+
+      if (opts?.take) query = query.limit(opts.take)
+      if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
+
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = { id: generateId(), createdAt: new Date().toISOString(), ...opts.data }
+      const { data, error } = await supabase
+        .from('CrawlLog')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase
+        .from('CrawlLog')
+        .select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  PipelineConfig — 管线键值配置
+  // ═══════════════════════════════════════════════════
+
+  pipelineConfig: {
+    async findMany(opts?: { where?: Filter }) {
+      let query = supabase.from('PipelineConfig').select('*')
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async findFirst(opts: { where: { key: string } }) {
+      const { data, error } = await supabase
+        .from('PipelineConfig')
+        .select('*')
+        .eq('key', opts.where.key)
+        .limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async upsert(opts: { key: string; value: string }) {
+      const now = new Date().toISOString()
+      // Check existence first, then update or insert
+      const { data: existing } = await supabase
+        .from('PipelineConfig')
+        .select('id')
+        .eq('key', opts.key)
+        .limit(1)
+
+      if (existing?.[0]) {
+        const { data, error } = await supabase
+          .from('PipelineConfig')
+          .update({ value: opts.value, updatedAt: now })
+          .eq('key', opts.key)
+          .select()
+          .single()
+        if (error) throw error
+        return data
+      } else {
+        const { data, error } = await supabase
+          .from('PipelineConfig')
+          .insert({
+            id: generateId(),
+            key: opts.key,
+            value: opts.value,
+            updatedAt: now,
+          })
+          .select()
+          .single()
+        if (error) throw error
+        return data
+      }
     },
   },
 

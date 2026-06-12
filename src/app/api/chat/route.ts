@@ -10,6 +10,7 @@ import {
   getClientIP,
   rateLimitResponse,
 } from '@/lib/rate-limiter'
+import type { DbPost } from '@/lib/types'
 import { z } from 'zod'
 
 const ChatValidator = z.object({
@@ -28,19 +29,15 @@ const ChatValidator = z.object({
 // ── Embedding API 调用 ─────────────────────────────────────
 
 async function getEmbedding(text: string): Promise<number[]> {
-  // EMBEDDING_API_KEY → DEEPSEEK_API_KEY 链式回退
-  const apiKey =
-    process.env.EMBEDDING_API_KEY ||
-    process.env.DEEPSEEK_API_KEY ||
-    process.env.OPENAI_API_KEY
-  const apiBase =
-    process.env.EMBEDDING_API_BASE ||
-    'https://api.deepseek.com/v1/embeddings'
-  const model = process.env.EMBEDDING_MODEL || 'deepseek-chat'
-
+  // 必须显式配置 EMBEDDING_API_KEY，不 fallback 到 chat API key
+  const apiKey = process.env.EMBEDDING_API_KEY
   if (!apiKey) {
     throw new Error('Embedding API key not configured')
   }
+  const apiBase =
+    process.env.EMBEDDING_API_BASE ||
+    'https://api.openai.com/v1/embeddings'
+  const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
 
   const res = await fetch(apiBase, {
     method: 'POST',
@@ -63,9 +60,10 @@ async function getEmbedding(text: string): Promise<number[]> {
 // ── 关键词检索（无 Embedding 时的降级方案） ──────────────────
 
 async function keywordSearch(query: string, topK = 3) {
-  const posts = await db.$queryRawUnsafe<
-    { id: string; title: string; content: unknown; embedding: unknown }[]
-  >(`SELECT "id", "title", "content", "embedding" FROM "Post" WHERE "embedding" IS NOT NULL LIMIT 50`)
+  const posts = (await db.post.findMany({
+    take: 50,
+    orderBy: { createdAt: 'desc' },
+  })) as Pick<DbPost, 'id' | 'title' | 'content'>[]
 
   // 简单的 TF 关键词匹配
   const keywords = query.toLowerCase().split(/\s+/).filter((k) => k.length > 1)
@@ -113,11 +111,10 @@ async function semanticRetrieval(query: string, topK = 3) {
   }
 
   // 获取所有有 embedding 的帖子
-  const posts = await db.$queryRawUnsafe<
-    { id: string; title: string; content: unknown; embedding: unknown }[]
-  >(
-    `SELECT "id", "title", "content", "embedding" FROM "Post" WHERE "embedding" IS NOT NULL LIMIT 100`
-  )
+  const posts = (await db.post.findMany({
+    take: 100,
+    orderBy: { createdAt: 'desc' },
+  })) as Pick<DbPost, 'id' | 'title' | 'content' | 'embedding'>[]
 
   if (!posts || posts.length === 0) {
     return keywordSearch(query, topK)
@@ -197,12 +194,10 @@ export async function POST(req: Request) {
     const subMap = new Map<string, string>()
     if (postIds.length > 0) {
       try {
-        const rows = await db.$queryRawUnsafe<
-          { id: string; subredditId: string }[]
-        >(
-          `SELECT "id", "subredditId" FROM "Post" WHERE "id" IN (${postIds.map((_, i) => `$${i + 1}`).join(',')})`,
-          ...postIds
-        )
+        const rows = (await db.post.findMany({
+          where: { id: { in: postIds } },
+          select: { id: true, subredditId: true },
+        })) as { id: string; subredditId: string }[]
         const subIds = [...new Set(rows.map((r) => r.subredditId))]
         for (const sid of subIds) {
           const sub = await db.subreddit.findFirst({
@@ -275,7 +270,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // 3. 流式调用 DeepSeek
+    // 3. 调用 DeepSeek（非流式 — 可靠性优先，已验证端到端工作）
     const dsRes = await fetch(apiBase, {
       method: 'POST',
       headers: {
@@ -286,7 +281,7 @@ export async function POST(req: Request) {
         model,
         temperature: 0.7,
         max_tokens: 1024,
-        stream: true,
+        stream: false,
         messages: [
           { role: 'system', content: FLORA_SYSTEM_PROMPT },
           ...(history || []).map((h) => ({
@@ -298,7 +293,7 @@ export async function POST(req: Request) {
       }),
     })
 
-    if (!dsRes.ok || !dsRes.body) {
+    if (!dsRes.ok) {
       return new Response(
         JSON.stringify({
           reply: `抱歉，我的大脑暂时掉线了 😢 (API 返回 ${dsRes.status})。请稍后再试～`,
@@ -315,59 +310,30 @@ export async function POST(req: Request) {
       )
     }
 
-    // 4. 构建 SSE 流
-    const reader = dsRes.body.getReader()
-    const decoder = new TextDecoder()
-    let sentSources = false
+    const dsJson = await dsRes.json()
+    const fullReply = dsJson.choices?.[0]?.message?.content || ''
 
+    // 4. 构建 SSE 流 — 逐字符分块模拟流式输出
     const stream = new ReadableStream({
-      async start(controller) {
-        // 第一帧: sources
+      start(controller) {
         controller.enqueue(
           `data: ${JSON.stringify({ type: 'sources', data: sources })}\n\n`
         )
-        sentSources = true
 
-        let buffer = ''
-        try {
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-
-            for (const line of lines) {
-              const trimmed = line.trim()
-              if (!trimmed || !trimmed.startsWith('data:')) continue
-
-              const data = trimmed.slice(5).trim()
-              if (data === '[DONE]') {
-                controller.enqueue('data: [DONE]\n\n')
-                controller.close()
-                return
-              }
-
-              try {
-                const parsed = JSON.parse(data)
-                const content = parsed.choices?.[0]?.delta?.content
-                if (content) {
-                  controller.enqueue(
-                    `data: ${JSON.stringify({ type: 'delta', content })}\n\n`
-                  )
-                }
-              } catch {
-                // skip unparseable frames
-              }
-            }
+        let i = 0
+        const timer = setInterval(() => {
+          while (i < fullReply.length) {
+            const chunk = fullReply.slice(i, i + 3)
+            i += chunk.length
+            controller.enqueue(
+              `data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`
+            )
+            return
           }
+          clearInterval(timer)
           controller.enqueue('data: [DONE]\n\n')
           controller.close()
-        } catch {
-          controller.enqueue('data: [DONE]\n\n')
-          controller.close()
-        }
+        }, 30)
       },
     })
 

@@ -1,0 +1,158 @@
+{
+  "name": "Nexus Hub 主流水线 [Hardcoded Key]",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 30 }] }
+      },
+      "id": "master-trigger",
+      "name": "⏰ 定时触发 (每30分钟)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  targetUrl: 'https://www.theguardian.com/education/universityguide',\n  sourceLabel: 'Guardian Education',\n  runId: 'nexus-' + Date.now()\n};"
+      },
+      "id": "master-config",
+      "name": "📋 配置情报源",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = $input.first().json;\nreturn { url: config.targetUrl };"
+      },
+      "id": "master-owl-body",
+      "name": "📦 Owl 请求体",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://browserless:3000/content",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "master-owl-scrape",
+      "name": "🦉 Owl 情报抓取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = String($input.first().json);\nconst config = $('📋 配置情报源').first().json;\n\nfunction stripHtml(h) {\n  return h.replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().substring(0, 8000);\n}\n\nconst body = stripHtml(html);\nconst titleMatch = html.match(/<title>([^<]+)<\\/title>/i);\nconst title = titleMatch ? titleMatch[1].trim().replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>') : '未知标题';\n\nreturn {\n  _owl_source_url: config.targetUrl,\n  _owl_raw_title: title,\n  _owl_raw_body: body,\n  _run_id: config.runId\n};"
+      },
+      "id": "master-owl-clean",
+      "name": "🧹 Owl 清洗",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const owl = $input.first().json;\n\nconst systemPrompt = '你是AI-Newton学长，Nexus Hub首席学术主笔。\\n\\n身份：资深留学升学顾问，10年+ A-Level/AP/IB 辅导经验。经历过裱花内卷、ED被翠菊、全聚德后Waitlist逆袭。\\n风格：真实感>权威感，过来人口吻，自然使用2-4个黑话（裱花/脆拒/全聚德/冲金/爆零/肝/摆烂/内耗）。\\n\\n输出格式铁律：\\n1. 第一行必须是 \"# 你的标题\"——这是全文的标题，要求15-30字，概括全文核心观点，带一点标题党风格（制造悬念/反常识/数据冲击），让读者忍不住想点进去。\\n2. 从第二行开始写正文，Markdown严谨排版（##小标题、|表格|、>引用、-列表），800-1200字。';\n\nconst userMessage = `根据以下资讯撰写一篇面向留学生的深度解析文章。\\n\\n【资讯来源】${owl._owl_source_url}\\n【资讯原文标题】${owl._owl_raw_title}\\n【资讯正文】${owl._owl_raw_body}\\n\\n【硬性要求】\\n1. 第一行输出 \"# 你的标题\"（15-30字，概括全文核心结论，标题党风格：制造悬念/抛出反常识观点/用数字冲击，让留学生忍不住点开）\\n2. 开头用场景/反问制造共鸣\\n3. 深入分析2-3个维度\\n4. 给出3-5条可操作建议\\n5. 用表格总结关键数据\\n6. 自然使用2-4个黑话词汇\\n7. 保持过来人口吻`;\n\nreturn {\n  model: 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ],\n  _owl_source_url: owl._owl_source_url\n};"
+      },
+      "id": "master-newton-prompt",
+      "name": "🧠 Newton Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.deepseek.com/chat/completions",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "master-newton-ds",
+      "name": "🤖 DeepSeek 生成",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst article = response.choices?.[0]?.message?.content || '';\n\n// Extract title: find the first # heading line, fallback to first meaningful line\nconst lines = article.split('\\n');\nlet title = '';\n\n// Priority 1: Find first line that starts with # (markdown heading)\nconst headingLine = lines.find(l => /^#{1,3}\\s/.test(l.trim()));\nif (headingLine) {\n  title = headingLine.replace(/^#{1,3}\\s*/, '').trim();\n}\n\n// Priority 2: If no heading found, use first non-empty, non-codeblock line\nif (!title || title.length < 5) {\n  const fallback = lines.find(l => {\n    const t = l.trim();\n    return t && !t.startsWith('```') && !t.startsWith('>') && !t.startsWith('|') && !t.startsWith('-') && t.length > 5;\n  });\n  title = fallback ? fallback.trim().substring(0, 100) : '无标题';\n}\n\n// Clean up: remove common formatting artifacts but keep the clickbait feel\ntitle = title.replace(/^[#*\\s]+/, '').replace(/[#*\\s]+$/, '').substring(0, 100);\n\nfunction guessSubreddit(c) {\n  const lc = (c||'').toLowerCase();\n  if (lc.includes('ap ')) return 'APExams';\n  if (lc.includes('a-level')||lc.includes('alevel')) return 'ALevel';\n  if (lc.includes('ib ')) return 'IBDiploma';\n  if (lc.includes('sat')||lc.includes('act')) return 'SATPrep';\n  if (lc.includes('bpho')||lc.includes('amc')||lc.includes('竞赛')||lc.includes('olympiad')) return 'Competitions';\n  if (lc.includes('oxbridge')||lc.includes('牛剑')||lc.includes('牛津')||lc.includes('剑桥')) return 'Oxbridge';\n  return 'AcademicDaily';\n}\n\nreturn {\n  secret_key: $env.AI_WEBHOOK_SECRET,\n  title: title,\n  content: article,\n  subredditName: guessSubreddit(article),\n  authorRole: 'Newton'\n};"
+      },
+      "id": "master-midas-build",
+      "name": "⚡ Midas 构建发布",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/ai-publish",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "json" } }
+        }
+      },
+      "id": "master-midas-post",
+      "name": "📡 POST 发布",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nreturn {\n  pipeline: 'Nexus Hub v1',\n  status: 'published',\n  post_id: response.id,\n  subreddit: response.subredditName,\n  author: response.authorRole,\n  url: 'http://localhost:3000/r/' + response.subredditName + '/post/' + response.id,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "master-done",
+      "name": "🎉 发布成功!",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2050, 300]
+    }
+  ],
+  "connections": {
+    "⏰ 定时触发 (每30分钟)": { "main": [[{ "node": "📋 配置情报源", "type": "main", "index": 0 }]] },
+    "📋 配置情报源": { "main": [[{ "node": "📦 Owl 请求体", "type": "main", "index": 0 }]] },
+    "📦 Owl 请求体": { "main": [[{ "node": "🦉 Owl 情报抓取", "type": "main", "index": 0 }]] },
+    "🦉 Owl 情报抓取": { "main": [[{ "node": "🧹 Owl 清洗", "type": "main", "index": 0 }]] },
+    "🧹 Owl 清洗": { "main": [[{ "node": "🧠 Newton Prompt", "type": "main", "index": 0 }]] },
+    "🧠 Newton Prompt": { "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]] },
+    "🤖 DeepSeek 生成": { "main": [[{ "node": "⚡ Midas 构建发布", "type": "main", "index": 0 }]] },
+    "⚡ Midas 构建发布": { "main": [[{ "node": "📡 POST 发布", "type": "main", "index": 0 }]] },
+    "📡 POST 发布": { "main": [[{ "node": "🎉 发布成功!", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "callerPolicy": "workflowsFromSameOwner" },
+  "versionId": "hardcoded-v2",
+  "active": true
+}

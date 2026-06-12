@@ -35,6 +35,9 @@ services:
       - GENERIC_TIMEZONE=Asia/Shanghai
       # 外部访问（宿主机 Next.js API）
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=true
+      - N8N_ALLOWED_ENV_VARS=DEEPSEEK_API_KEY,DEEPSEEK_API_BASE,DEEPSEEK_MODEL,AI_WEBHOOK_SECRET,OPENAI_API_KEY,EMBEDDING_API_BASE,EMBEDDING_MODEL
+      # REST API 认证 — 管理后台通过 API 操控 n8n
+      - N8N_API_KEY=${N8N_API_KEY:-nexus-n8n-api-key-change-me}
       # 工作流导出路径
       - N8N_DEFAULT_LOCALE=zh_CN
       # Nexus Hub — AI 发布密钥

@@ -17,6 +17,8 @@ export default async function AdminLayout({
     users: dict.admin.users,
     posts: dict.admin.posts,
     aiAgents: dict.admin.aiAgents,
+    aiDashboard: dict.admin.aiDashboard,
+    intelSources: dict.admin.intelSources,
     systemStatus: dict.admin.systemStatus,
     backToSite: dict.admin.backToSite,
   }

@@ -182,3 +182,49 @@ model NewsletterSubscriber {
   confirmed    Boolean  @default(false)
   confirmToken String?
 }
+
+model IntelSource {
+  id                  String    @id @default(cuid())
+  label               String
+  url                 String
+  type                String    @default("webpage") // "rss" | "webpage"
+  category            String?   // "admissions" | "exams" | "rankings" | "general"
+  priority            String    @default("medium")  // "high" | "medium" | "low"
+  crawlInterval       Int       @default(30)        // 分钟
+  isActive            Boolean   @default(true)
+  contentSelector     String?   // CSS 选择器
+  consecutiveFailures Int       @default(0)
+  maxFailures         Int       @default(5)
+  lastCrawlAt         DateTime?
+  lastError           String?
+  crawlCount          Int       @default(0)
+  articleCount        Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  crawlLogs CrawlLog[]
+}
+
+model CrawlLog {
+  id            String      @id @default(cuid())
+  source        IntelSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceId      String
+  status        String      // "success" | "failed" | "deduplicated"
+  url           String?
+  title         String?
+  contentHash   String?
+  contentLength Int?
+  errorMessage  String?
+  postId        String?
+  duration      Int?
+  createdAt     DateTime    @default(now())
+
+  @@index([sourceId, createdAt])
+}
+
+model PipelineConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   // JSON
+  updatedAt DateTime @updatedAt
+}

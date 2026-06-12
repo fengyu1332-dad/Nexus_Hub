@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { redis } from '@/lib/redis'
+import { n8n } from '@/lib/n8n'
 import { logger } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,17 @@ export async function GET() {
   } catch (e) {
     checks.redis = { status: 'error', latencyMs: Date.now() - redisStart, error: String(e) }
     logger.error('Health check: Redis failed', { error: String(e) })
+  }
+
+  // n8n check
+  const n8nStart = Date.now()
+  try {
+    const online = await n8n.ping()
+    checks.n8n = online
+      ? { status: 'ok', latencyMs: Date.now() - n8nStart }
+      : { status: 'error', latencyMs: Date.now() - n8nStart, error: 'n8n unreachable' }
+  } catch (e) {
+    checks.n8n = { status: 'error', latencyMs: Date.now() - n8nStart, error: String(e) }
   }
 
   const allHealthy = Object.values(checks).every((c) => c.status === 'ok')
