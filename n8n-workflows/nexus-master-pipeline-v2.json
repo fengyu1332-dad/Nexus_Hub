@@ -105,7 +105,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 组装 browserless /content 请求体\nvar item = $input.first().json;\nreturn {\n  url: item._targetUrl\n};"
+        "jsCode": "// 组装 browserless /content 请求体（保留下游需要的字段）\nvar item = $input.first().json;\nreturn {\n  url: item._targetUrl,\n  _targetUrl: item._targetUrl,\n  _sourceId: item._sourceId,\n  _sourceLabel: item._sourceLabel,\n  _contentSelector: item._contentSelector,\n  _run_id: item._run_id\n};"
       },
       "id": "v2-build-web-body",
       "name": "📋 构建网页请求体",
@@ -125,10 +125,15 @@
           ]
         },
         "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "url", "value": "={{ $json._targetUrl || $('📦 构建抓取请求').first().json._targetUrl }}" }
+          ]
+        },
         "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
         "options": {
           "timeout": 30000,
+          "neverError": true,
           "response": { "response": { "responseFormat": "string" } }
         }
       },
