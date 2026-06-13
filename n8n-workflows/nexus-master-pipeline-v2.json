@@ -119,7 +119,7 @@
         "specifyBody": "json",
         "jsonBody": "={{ $json }}",
         "options": {
-          "timeout": 45000,
+          "timeout": 90000,
           "neverError": true,
           "response": { "response": { "responseFormat": "string" } }
         }

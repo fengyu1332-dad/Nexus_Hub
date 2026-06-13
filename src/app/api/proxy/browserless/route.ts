@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: body.url,
-          gotoOptions: { timeout: 60000 },
+          gotoOptions: { timeout: 60000, waitUntil: 'domcontentloaded' },
         }),
         signal: AbortSignal.timeout(65000),
       })
