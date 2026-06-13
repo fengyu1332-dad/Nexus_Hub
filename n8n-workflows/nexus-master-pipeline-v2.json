@@ -105,12 +105,29 @@
     },
     {
       "parameters": {
-        "jsCode": "// 使用 fetch 直连 browserless，绕过 n8n HTTP 节点的 body 校验问题\nconst item = $input.first().json;\nconst targetUrl = item._targetUrl || item.url;\n\nreturn fetch('http://browserless:3000/content', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ url: targetUrl })\n}).then(response => response.text()).then(html => {\n  return { json: html };\n}).catch(e => {\n  return { json: 'FETCH_ERROR: ' + e.message };\n});"
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/proxy/browserless",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "nexus-hub-test-secret-2026" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 45000,
+          "neverError": true,
+          "response": { "response": { "responseFormat": "string" } }
+        }
       },
       "id": "v2-scrape-web",
       "name": "🦉 网页抓取",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [1450, 400]
     },
     {
