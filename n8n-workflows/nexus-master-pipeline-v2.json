@@ -45,7 +45,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 根据源类型构建抓取请求\nvar src = $input.first().json;\n\n// RSS: 直接用 HTTP GET 抓取\nif (src.sourceType === 'rss') {\n  return {\n    method: 'GET',\n    url: src.targetUrl,\n    _mode: 'rss',\n    _sourceId: src.sourceId,\n    _sourceLabel: src.sourceLabel,\n    _run_id: src.runId\n  };\n}\n\n// Webpage: 通过 browserless（仅传元数据，HTTP 节点自行组装 body）\nreturn {\n  _mode: 'webpage',\n  _sourceId: src.sourceId,\n  _sourceLabel: src.sourceLabel,\n  _targetUrl: src.targetUrl,\n  _contentSelector: src.contentSelector,\n  _run_id: src.runId\n};"
+        "jsCode": "// 根据源类型构建抓取请求\nvar src = $input.first().json;\n\n// RSS: 直接用 HTTP GET 抓取\nif (src.sourceType === 'rss') {\n  return {\n    method: 'GET',\n    url: src.targetUrl,\n    _mode: 'rss',\n    _sourceId: src.sourceId,\n    _sourceLabel: src.sourceLabel,\n    _run_id: src.runId\n  };\n}\n\n// Webpage: 通过 browserless（url 字段供 HTTP 节点直接发送）\nreturn {\n  url: src.targetUrl,\n  _mode: 'webpage',\n  _sourceId: src.sourceId,\n  _sourceLabel: src.sourceLabel,\n  _targetUrl: src.targetUrl,\n  _contentSelector: src.contentSelector,\n  _run_id: src.runId\n};"
       },
       "id": "v2-build-request",
       "name": "📦 构建抓取请求",
@@ -116,7 +116,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { url: $json._targetUrl } }}",
+        "jsonBody": "={{ $json }}",
         "options": {
           "timeout": 30000,
           "neverError": true,
