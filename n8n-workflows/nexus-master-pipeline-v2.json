@@ -105,16 +105,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// 组装 browserless /content 请求体（保留下游需要的字段）\nvar item = $input.first().json;\nreturn {\n  url: item._targetUrl,\n  _targetUrl: item._targetUrl,\n  _sourceId: item._sourceId,\n  _sourceLabel: item._sourceLabel,\n  _contentSelector: item._contentSelector,\n  _run_id: item._run_id\n};"
-      },
-      "id": "v2-build-web-body",
-      "name": "📋 构建网页请求体",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1250, 400]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "http://browserless:3000/content",
         "authentication": "none",
@@ -125,12 +115,8 @@
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "url", "value": "={{ $json._targetUrl || $('📦 构建抓取请求').first().json._targetUrl }}" }
-          ]
-        },
         "specifyBody": "json",
+        "jsonBody": "={{ { url: $json._targetUrl } }}",
         "options": {
           "timeout": 30000,
           "neverError": true,
@@ -277,9 +263,8 @@
     "🌐 拉取情报源": { "main": [[{ "node": "📋 拆分源列表", "type": "main", "index": 0 }]] },
     "📋 拆分源列表": { "main": [[{ "node": "📦 构建抓取请求", "type": "main", "index": 0 }]] },
     "📦 构建抓取请求": { "main": [[{ "node": "🔀 路由分流", "type": "main", "index": 0 }]] },
-    "🔀 路由分流": { "main": [[{ "node": "📡 RSS抓取", "type": "main", "index": 0 }], [{ "node": "📋 构建网页请求体", "type": "main", "index": 0 }]] },
+    "🔀 路由分流": { "main": [[{ "node": "📡 RSS抓取", "type": "main", "index": 0 }], [{ "node": "🦉 网页抓取", "type": "main", "index": 0 }]] },
     "📡 RSS抓取": { "main": [[{ "node": "🧹 内容清洗", "type": "main", "index": 0 }]] },
-    "📋 构建网页请求体": { "main": [[{ "node": "🦉 网页抓取", "type": "main", "index": 0 }]] },
     "🦉 网页抓取": { "main": [[{ "node": "🧹 内容清洗", "type": "main", "index": 0 }]] },
     "🧹 内容清洗": { "main": [[{ "node": "🧠 Newton Prompt", "type": "main", "index": 0 }]] },
     "🧠 Newton Prompt": { "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]] },
