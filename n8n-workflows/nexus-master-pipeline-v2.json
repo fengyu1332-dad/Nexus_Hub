@@ -105,28 +105,12 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://browserless:3000/content",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "string",
-        "body": "={{ JSON.stringify($json) }}",
-        "options": {
-          "timeout": 30000,
-          "neverError": true,
-          "response": { "response": { "responseFormat": "string" } }
-        }
+        "jsCode": "// 使用 fetch 直连 browserless，绕过 n8n HTTP 节点的 body 校验问题\nconst item = $input.first().json;\nconst targetUrl = item._targetUrl || item.url;\n\nreturn fetch('http://browserless:3000/content', {\n  method: 'POST',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify({ url: targetUrl })\n}).then(response => response.text()).then(html => {\n  return { json: html };\n}).catch(e => {\n  return { json: 'FETCH_ERROR: ' + e.message };\n});"
       },
       "id": "v2-scrape-web",
       "name": "🦉 网页抓取",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [1450, 400]
     },
     {
