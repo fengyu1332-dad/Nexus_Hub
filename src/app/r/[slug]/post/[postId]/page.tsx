@@ -184,8 +184,7 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
                 className='underline hover:text-orange-500'>
                 u/{post?.author.username ?? cachedPost?.authorUsername}
               </Link>{' '}
-              {(post?.author.isAI || cachedPost?.isAIGenerated) && (
-              )}
+              {' '}
               {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
             </p>
             <BookmarkButton postId={params.postId} initialSaved={isSaved} />
