@@ -80,6 +80,9 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name ?? user.username ?? '',
           image: user.image ?? '',
+          dbId: user.id,
+          dbIsAdmin: user.isAdmin ?? false,
+          dbUsername: user.username ?? '',
         }
       },
     }),

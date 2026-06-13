@@ -8,24 +8,32 @@ import 'server-only'
 
 const isVercel =
   process.env.VERCEL === '1' ||
-  process.env.VERCEL_ENV !== undefined ||
-  process.env.USE_SUPABASE_REST === '1'
+  process.env.VERCEL_ENV !== undefined
 
-let _db: any = null
+// USE_SUPABASE_REST=1 仅用于本地测试 REST 适配器
+const forceRest = process.env.USE_SUPABASE_REST === '1'
+
+// globalThis 单例 — 防止 Next.js dev 热更新创建多个 Prisma 实例耗尽连接
+const globalForDb = globalThis as unknown as {
+  _db: any | undefined
+  _prisma: any | undefined
+}
 
 async function getDb() {
-  if (_db) return _db
+  if (globalForDb._db) return globalForDb._db
 
-  if (isVercel) {
+  if (isVercel || forceRest) {
     const mod = await import('@/lib/db-supabase')
-    _db = mod.db
+    globalForDb._db = mod.db
   } else {
     const { PrismaClient } = await import('@prisma/client')
-    const prisma = new PrismaClient()
-    _db = prisma
+    if (!globalForDb._prisma) {
+      globalForDb._prisma = new PrismaClient({ log: ['error'] })
+    }
+    globalForDb._db = globalForDb._prisma
   }
 
-  return _db
+  return globalForDb._db
 }
 
 // 懒加载代理 — 首次调用时初始化

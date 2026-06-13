@@ -47,6 +47,14 @@ const Page = () => {
         if (err.response?.status === 401) {
           return loginToast()
         }
+
+        if (err.response?.status === 403) {
+          return toast({
+            title: '仅限管理员',
+            description: '只有管理员可以创建讨论区板块。',
+            variant: 'destructive',
+          })
+        }
       }
 
       toast({

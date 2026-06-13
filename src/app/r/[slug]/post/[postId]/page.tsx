@@ -1,7 +1,7 @@
 import CommentsSection from '@/components/CommentsSection'
 import EditorOutput from '@/components/EditorOutput'
 import PostVoteServer from '@/components/post-vote/PostVoteServer'
-import { AIBadge } from '@/components/AIBadge'
+
 import { InlineMathProcessor } from '@/components/InlineMathProcessor'
 import { RelatedPosts } from '@/components/RelatedPosts'
 import BookmarkButton from '@/components/BookmarkButton'
@@ -185,7 +185,6 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
                 u/{post?.author.username ?? cachedPost?.authorUsername}
               </Link>{' '}
               {(post?.author.isAI || cachedPost?.isAIGenerated) && (
-                <AIBadge aiRole={post?.author.aiRole} />
               )}
               {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
             </p>

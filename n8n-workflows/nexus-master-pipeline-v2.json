@@ -19,7 +19,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key", "value": "={{ $env.AI_WEBHOOK_SECRET }}" }
+            { "name": "x-api-key", "value": "nexus-hub-test-secret-2026" }
           ]
         },
         "options": {
@@ -45,7 +45,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 根据源类型构建抓取请求\nvar src = $input.first().json;\n\n// RSS: 直接用 HTTP GET 抓取\nif (src.sourceType === 'rss') {\n  return {\n    method: 'GET',\n    url: src.targetUrl,\n    _mode: 'rss',\n    _sourceId: src.sourceId,\n    _sourceLabel: src.sourceLabel,\n    _run_id: src.runId\n  };\n}\n\n// Webpage: 通过 browserless\nreturn {\n  method: 'POST',\n  url: 'http://browserless:3000/content',\n  body: { url: src.targetUrl },\n  _mode: 'webpage',\n  _sourceId: src.sourceId,\n  _sourceLabel: src.sourceLabel,\n  _contentSelector: src.contentSelector,\n  _run_id: src.runId\n};"
+        "jsCode": "// 根据源类型构建抓取请求\nvar src = $input.first().json;\n\n// RSS: 直接用 HTTP GET 抓取\nif (src.sourceType === 'rss') {\n  return {\n    method: 'GET',\n    url: src.targetUrl,\n    _mode: 'rss',\n    _sourceId: src.sourceId,\n    _sourceLabel: src.sourceLabel,\n    _run_id: src.runId\n  };\n}\n\n// Webpage: 通过 browserless\nreturn {\n  method: 'POST',\n  url: 'http://browserless:3000/content',\n  body: { url: src.targetUrl },\n  _mode: 'webpage',\n  _sourceId: src.sourceId,\n  _sourceLabel: src.sourceLabel,\n  _targetUrl: src.targetUrl,\n  _contentSelector: src.contentSelector,\n  _run_id: src.runId\n};"
       },
       "id": "v2-build-request",
       "name": "📦 构建抓取请求",
@@ -55,49 +55,98 @@
     },
     {
       "parameters": {
-        "method": "POST",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "v2-route-condition",
+              "leftValue": "={{ $json._mode }}",
+              "rightValue": "rss",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "v2-route",
+      "name": "🔀 路由分流",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
         "url": "={{ $json.url }}",
         "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
             { "name": "User-Agent", "value": "NexusHub/2.0" }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.body ? $json.body : {} }}",
         "options": {
           "timeout": 30000,
           "response": { "response": { "responseFormat": "string" } }
         }
       },
-      "id": "v2-scrape",
-      "name": "🦉 内容抓取",
+      "id": "v2-scrape-rss",
+      "name": "📡 RSS抓取",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1050, 300]
+      "position": [1250, 200]
     },
     {
       "parameters": {
-        "jsCode": "// 清洗抓取结果（网页 HTML 或 RSS XML）\nvar scraped = String($input.first().json);\nvar meta = $('📦 构建抓取请求').first().json;\n\n// 基础 HTML/XML 清洗\nfunction stripTags(s) {\n  return s\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n// 提取标题\nvar titleMatch = scraped.match(/<title[^>]*>([^<]+)<\\/title>/i);\nvar title = titleMatch ? titleMatch[1].trim() : (meta._sourceLabel || '未知标题');\n\n// 尝试用 CSS 选择器精准提取正文\nvar body = stripTags(scraped);\nif (meta._contentSelector && meta._mode === 'webpage') {\n  var sel = meta._contentSelector;\n  var pattern = new RegExp('<' + sel + '[^>]*>([\\\\s\\\\S]*?)<\\\\/' + sel + '>', 'i');\n  var match = scraped.match(pattern);\n  if (match) {\n    body = stripTags(match[1]);\n  }\n}\n\nreturn {\n  _owl_source_url: meta._mode === 'rss' ? ('rss://' + meta._sourceLabel) : meta.url,\n  _owl_raw_title: title,\n  _owl_raw_body: body.substring(0, 8000),\n  _run_id: meta._run_id,\n  _sourceId: meta._sourceId,\n  _sourceLabel: meta._sourceLabel\n};"
+        "method": "POST",
+        "url": "http://browserless:3000/content",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 30000,
+          "response": { "response": { "responseFormat": "string" } }
+        }
+      },
+      "id": "v2-scrape-web",
+      "name": "🦉 网页抓取",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 清洗抓取结果：RSS XML → 拆分为多篇独立文章 | 网页 HTML → 去标签清洗\nvar scraped = String($input.first().json);\nvar meta = $('📦 构建抓取请求').first().json;\n\nfunction stripTags(s) {\n  return s\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/&quot;/g, '\"')\n    .replace(/&#39;/g, \"'\")\n    .replace(/&apos;/g, \"'\")\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n// ── RSS 模式：解析 <item> 标签，每篇文章成为一个独立 item ──\nif (meta._mode === 'rss') {\n  var items = [];\n  var re = /<item>([\\s\\S]*?)<\\/item>/gi;\n  var m;\n  while ((m = re.exec(scraped)) !== null) {\n    var xml = m[1];\n    var t = xml.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);\n    var l = xml.match(/<link[^>]*>([\\s\\S]*?)<\\/link>/i);\n    var d = xml.match(/<description[^>]*>([\\s\\S]*?)<\\/description>/i);\n    var title = t ? stripTags(t[1]) : '';\n    var link = l ? stripTags(l[1]) : '';\n    var body = d ? stripTags(d[1]) : stripTags(xml);\n\n    if (title || body) {\n      items.push({\n        json: {\n          _owl_source_url: link || meta.url,\n          _owl_raw_title: title,\n          _owl_raw_body: body.substring(0, 8000),\n          _run_id: meta._run_id + '-' + items.length,\n          _sourceId: meta._sourceId,\n          _sourceLabel: meta._sourceLabel\n        }\n      });\n    }\n    if (items.length >= 10) break;   // 每次最多取 10 篇\n  }\n  if (items.length > 0) return items;\n\n  // RSS 格式异常（无 <item>），降级为单篇处理\n  var ft = scraped.match(/<title[^>]*>([\\s\\S]*?)<\\/title>/i);\n  return {\n    _owl_source_url: 'rss://' + (meta._sourceLabel || '未知来源'),\n    _owl_raw_title: ft ? stripTags(ft[1]) : (meta._sourceLabel || 'RSS'),\n    _owl_raw_body: stripTags(scraped).substring(0, 8000),\n    _run_id: meta._run_id,\n    _sourceId: meta._sourceId,\n    _sourceLabel: meta._sourceLabel\n  };\n}\n\n// ── Webpage 模式：HTML 清洗 ──\nvar titleMatch = scraped.match(/<title[^>]*>([^<]+)<\\/title>/i);\nvar title = titleMatch ? titleMatch[1].trim() : (meta._sourceLabel || '未知标题');\nvar body = stripTags(scraped);\nif (meta._contentSelector && meta._mode === 'webpage') {\n  var sel = meta._contentSelector;\n  var pattern = new RegExp('<' + sel + '[^>]*>([\\\\s\\\\S]*?)<\\\\/' + sel + '>', 'i');\n  var selMatch = scraped.match(pattern);\n  if (selMatch) { body = stripTags(selMatch[1]); }\n}\n\nreturn {\n  _owl_source_url: (meta._targetUrl) || (meta.body && meta.body.url) || meta.url,\n  _owl_raw_title: title,\n  _owl_raw_body: body.substring(0, 8000),\n  _run_id: meta._run_id,\n  _sourceId: meta._sourceId,\n  _sourceLabel: meta._sourceLabel\n};"
       },
       "id": "v2-clean",
       "name": "🧹 内容清洗",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [1450, 300]
     },
     {
       "parameters": {
-        "jsCode": "// 构建 Newton Prompt + 计算内容哈希\nvar owl = $input.first().json;\n\n// 简单哈希（替代 crypto 模块，沙箱兼容）\nfunction simpleHash(s) {\n  var h = 0;\n  for (var i = 0; i < s.length; i++) {\n    h = ((h << 5) - h + s.charCodeAt(i)) | 0;\n  }\n  return 'h' + Math.abs(h).toString(16);\n}\nvar contentHash = simpleHash(owl._owl_raw_title + owl._owl_raw_body.substring(0, 500));\n\nvar systemPrompt = '你是AI-Newton学长，Nexus Hub首席学术主笔。\\n\\n身份：资深留学升学顾问，10年+ A-Level/AP/IB 辅导经验。经历过裱花内卷、ED被翠菊、全聚德后Waitlist逆袭。\\n风格：真实感>权威感，过来人口吻，自然使用2-4个黑话（裱花/脆拒/全聚德/冲金/爆零/肝/摆烂/内耗）。\\n\\n输出格式铁律：\\n1. 第一行必须是 \"# 你的标题\"——这是全文的标题，要求15-30字，概括全文核心观点，带一点标题党风格（制造悬念/反常识/数据冲击），让读者忍不住想点进去。\\n2. 从第二行开始写正文，Markdown严谨排版（##小标题、|表格|、>引用、-列表），800-1200字。';\n\nvar userMessage = '根据以下资讯撰写一篇面向留学生的深度解析文章。\\n\\n【资讯来源】' + owl._owl_source_url + '\\n【资讯原文标题】' + owl._owl_raw_title + '\\n【资讯正文】' + owl._owl_raw_body + '\\n\\n【硬性要求】\\n1. 第一行输出 \"# 你的标题\"（15-30字，概括全文核心结论，标题党风格：制造悬念/抛出反常识观点/用数字冲击，让留学生忍不住点开）\\n2. 开头用场景/反问制造共鸣\\n3. 深入分析2-3个维度\\n4. 给出3-5条可操作建议\\n5. 用表格总结关键数据\\n6. 自然使用2-4个黑话词汇\\n7. 保持过来人口吻';\n\nreturn {\n  model: 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ],\n  _owl_source_url: owl._owl_source_url,\n  _owl_raw_title: owl._owl_raw_title,\n  _sourceId: owl._sourceId,\n  _sourceLabel: owl._sourceLabel,\n  _contentHash: contentHash,\n  _run_id: owl._run_id\n};"
+        "jsCode": "// 构建 Newton Prompt + 计算内容哈希\nvar owl = $input.first().json;\n\n// 简单哈希（替代 crypto 模块，沙箱兼容）\nfunction simpleHash(s) {\n  var h = 0;\n  for (var i = 0; i < s.length; i++) {\n    h = ((h << 5) - h + s.charCodeAt(i)) | 0;\n  }\n  return 'h' + Math.abs(h).toString(16);\n}\nvar contentHash = simpleHash(owl._owl_raw_title + owl._owl_raw_body.substring(0, 500));\n\nvar systemPrompt = '你是AI-Newton学长，Nexus Hub首席学术主笔。\\n\\n身份：资深留学升学顾问，10年+ A-Level/AP/IB 辅导经验。经历过裱花内卷、ED被翠菊、全聚德后Waitlist逆袭。\\n风格：真实感>权威感，过来人口吻，自然使用2-4个黑话（裱花/脆拒/全聚德/冲金/爆零/肝/摆烂/内耗）。\\n\\n输出格式铁律：\\n1. 第一行输出 \"# \" 开头的 Markdown 标题（15-30字，概括全文核心观点，制造悬念/反常识/数据冲击）。\\n2. 从第二行开始写正文，Markdown严谨排版（##小标题、|表格|、>引用、-列表），800-1200字。\\n3. 文章最后一行必须输出 [BOARD: 板块slug]，从以下15个板块中选择最匹配的一个：sat-act(SAT/ACT)、ap-olympiad(AP与竞赛)、alevel-ib(A-Level/IB)、lang-exams(语言考试)、school-select(选校定位)、essay-writing(文书写作)、app-strategy(申请策略)、bg-boost(背景提升)、us-undergrad(美国本科)、uk-commonwealth(英联邦)、eu-asia(欧亚及其他)、visa-immigration(签证移民)、pre-departure(行前准备)、career-jobs(实习就业)、student-life(留学生活)。';\n\nvar userMessage = '根据以下资讯撰写一篇面向留学生的深度解析文章。\\n\\n【资讯来源】' + owl._owl_source_url + '\\n【资讯原文标题】' + owl._owl_raw_title + '\\n【资讯正文】' + owl._owl_raw_body + '\\n\\n【硬性要求】\\n1. 第一行用 \"# \" 开头输出 Markdown 标题（15-30字，概括全文核心结论，标题党风格）\\n2. 开头用场景/反问制造共鸣\\n3. 深入分析2-3个维度\\n4. 给出3-5条可操作建议\\n5. 用表格总结关键数据\\n6. 自然使用2-4个黑话词汇\\n7. 保持过来人口吻';\n\nreturn {\n  model: 'deepseek-chat',\n  temperature: 0.7,\n  max_tokens: 4096,\n  messages: [\n    { role: 'system', content: systemPrompt },\n    { role: 'user', content: userMessage }\n  ],\n  _owl_source_url: owl._owl_source_url,\n  _owl_raw_title: owl._owl_raw_title,\n  _sourceId: owl._sourceId,\n  _sourceLabel: owl._sourceLabel,\n  _contentHash: contentHash,\n  _run_id: owl._run_id\n};"
       },
       "id": "v2-newton-prompt",
       "name": "🧠 Newton Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1450, 300]
+      "position": [1650, 300]
     },
     {
       "parameters": {
@@ -108,7 +157,7 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "=Bearer {{ $env.DEEPSEEK_API_KEY }}" }
+            { "name": "Authorization", "value": "Bearer sk-450d9f74ef87422597b1e518d3e5b213" }
           ]
         },
         "sendBody": true,
@@ -123,17 +172,17 @@
       "name": "🤖 DeepSeek 生成",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1650, 300]
+      "position": [1850, 300]
     },
     {
       "parameters": {
-        "jsCode": "// 提取标题 + 判断 subreddit + 构建发布请求\nvar response = $input.first().json;\nvar prompt = $('🧠 Newton Prompt').first().json;\nvar article = (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) || '';\n\nvar lines = article.split('\\n');\nvar title = '';\n\n// Priority 1: Find markdown heading\nfor (var i = 0; i < lines.length; i++) {\n  if (/^#{1,3}\\s/.test(lines[i].trim())) {\n    title = lines[i].replace(/^#{1,3}\\s*/, '').trim();\n    break;\n  }\n}\n\n// Priority 2: Fallback to first meaningful line\nif (!title || title.length < 5) {\n  for (var j = 0; j < lines.length; j++) {\n    var t = lines[j].trim();\n    if (t && t.indexOf('```') !== 0 && t.indexOf('>') !== 0 && t.indexOf('|') !== 0 && t.indexOf('-') !== 0 && t.length > 5) {\n      title = t.substring(0, 100);\n      break;\n    }\n  }\n}\n\nif (!title) title = '无标题';\ntitle = title.replace(/^[#*\\s]+/, '').replace(/[#*\\s]+$/, '').substring(0, 100);\n\nfunction guessSubreddit(c) {\n  var lc = (c||'').toLowerCase();\n  if (lc.indexOf('ap ') >= 0) return 'APExams';\n  if (lc.indexOf('a-level') >= 0 || lc.indexOf('alevel') >= 0) return 'ALevel';\n  if (lc.indexOf('ib ') >= 0) return 'IBDiploma';\n  if (lc.indexOf('sat') >= 0 || lc.indexOf('act') >= 0) return 'SATPrep';\n  if (lc.indexOf('bpho') >= 0 || lc.indexOf('amc') >= 0 || lc.indexOf('竞赛') >= 0 || lc.indexOf('olympiad') >= 0) return 'Competitions';\n  if (lc.indexOf('oxbridge') >= 0 || lc.indexOf('牛剑') >= 0 || lc.indexOf('牛津') >= 0 || lc.indexOf('剑桥') >= 0) return 'Oxbridge';\n  return 'AcademicDaily';\n}\n\nreturn {\n  secret_key: $env.AI_WEBHOOK_SECRET,\n  title: title,\n  content: article,\n  subredditName: guessSubreddit(article),\n  authorRole: 'Newton',\n  _sourceId: prompt._sourceId,\n  _sourceLabel: prompt._sourceLabel,\n  _contentHash: prompt._contentHash,\n  _owl_raw_title: prompt._owl_raw_title\n};"
+        "jsCode": "// 提取标题 + 判断 subreddit + 构建发布请求\nvar response = $input.first().json;\nvar prompt = $('🧠 Newton Prompt').first().json;\nvar article = (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) || '';\n\n// Extract board classification from LLM output: [BOARD: slug]\nvar boardMatch = article.match(/\\[BOARD:\\s*([a-z-]+)\\]/i);\nvar subredditName = boardMatch ? boardMatch[1] : 'student-life';\n// Remove the board marker from displayed content\narticle = article.replace(/\\n?\\[BOARD:\\s*[a-z-]+\\]\\s*/i, '');\n\nvar lines = article.split('\\n');\nvar title = '';\n\n// Priority 1: Find markdown heading\nfor (var i = 0; i < lines.length; i++) {\n  if (/^#{1,3}\\s/.test(lines[i].trim())) {\n    title = lines[i].replace(/^#{1,3}\\s*/, '').trim();\n    break;\n  }\n}\n\n// Priority 2: Fallback to first meaningful line\nif (!title || title.length < 5) {\n  for (var j = 0; j < lines.length; j++) {\n    var t = lines[j].trim();\n    if (t && t.indexOf('```') !== 0 && t.indexOf('>') !== 0 && t.indexOf('|') !== 0 && t.indexOf('-') !== 0 && t.length > 5) {\n      title = t.substring(0, 100);\n      break;\n    }\n  }\n}\n\nif (!title) title = '无标题';\ntitle = title.replace(/^[#*\\s]+/, '').replace(/[#*\\s]+$/, '').replace(/^(你的标题|标题)[：:\\s]*/i, '').substring(0, 100);\n\nreturn {\n  secret_key: 'nexus-hub-test-secret-2026',\n  title: title,\n  content: article,\n  subredditName: subredditName,\n  authorRole: 'Newton',\n  _sourceId: prompt._sourceId,\n  _sourceLabel: prompt._sourceLabel,\n  _contentHash: prompt._contentHash,\n  _owl_raw_title: prompt._owl_raw_title\n};"
       },
       "id": "v2-midas-build",
       "name": "⚡ Midas 构建发布",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1850, 300]
+      "position": [2050, 300]
     },
     {
       "parameters": {
@@ -151,6 +200,7 @@
         "jsonBody": "={{ $json }}",
         "options": {
           "timeout": 30000,
+          "neverError": true,
           "response": { "response": { "responseFormat": "json" } }
         }
       },
@@ -158,17 +208,17 @@
       "name": "📡 POST 发布",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2050, 300]
+      "position": [2250, 300]
     },
     {
       "parameters": {
-        "jsCode": "// 构建采集日志请求体（供下游 HTTP Request 节点发送）\nvar publishResult = $input.first().json;\nvar midas = $('⚡ Midas 构建发布').first().json;\n\nreturn {\n  secret_key: $env.AI_WEBHOOK_SECRET,\n  sourceId: midas._sourceId,\n  status: publishResult.id ? 'success' : 'failed',\n  title: midas._owl_raw_title || midas.title,\n  contentHash: midas._contentHash,\n  contentLength: (midas.content || '').length,\n  postId: publishResult.id || null,\n  _pipeline: 'Nexus Hub v2',\n  _post_id: publishResult.id || null,\n  _subreddit: publishResult.subredditName,\n  _source_id: midas._sourceId,\n  _timestamp: new Date().toISOString()\n};"
+        "jsCode": "// 构建采集日志请求体 — 区分 success / deduplicated / failed\nvar publishResult = $input.first().json;\nvar midas = $('⚡ Midas 构建发布').first().json;\n\nvar status, postId;\nif (publishResult.duplicate) {\n  status = 'deduplicated';\n  postId = publishResult.existingPostId || null;\n} else if (publishResult.id) {\n  status = 'success';\n  postId = publishResult.id;\n} else {\n  status = 'failed';\n  postId = null;\n}\n\nreturn {\n  secret_key: 'nexus-hub-test-secret-2026',\n  sourceId: midas._sourceId,\n  status: status,\n  title: midas._owl_raw_title || midas.title,\n  contentHash: midas._contentHash,\n  contentLength: (midas.content || '').length,\n  postId: postId,\n  _pipeline: 'Nexus Hub v2',\n  _post_id: postId,\n  _subreddit: publishResult.subredditName,\n  _source_id: midas._sourceId,\n  _timestamp: new Date().toISOString()\n};"
       },
       "id": "v2-build-log",
       "name": "📝 构建日志",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2250, 300]
+      "position": [2450, 300]
     },
     {
       "parameters": {
@@ -179,7 +229,7 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "x-api-key", "value": "={{ $env.AI_WEBHOOK_SECRET }}" }
+            { "name": "x-api-key", "value": "nexus-hub-test-secret-2026" }
           ]
         },
         "sendBody": true,
@@ -194,7 +244,7 @@
       "name": "📊 记录日志",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2450, 300]
+      "position": [2650, 300]
     },
     {
       "parameters": {
@@ -204,15 +254,17 @@
       "name": "🎉 完成",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2650, 300]
+      "position": [2850, 300]
     }
   ],
   "connections": {
     "⏰ 定时触发": { "main": [[{ "node": "🌐 拉取情报源", "type": "main", "index": 0 }]] },
     "🌐 拉取情报源": { "main": [[{ "node": "📋 拆分源列表", "type": "main", "index": 0 }]] },
     "📋 拆分源列表": { "main": [[{ "node": "📦 构建抓取请求", "type": "main", "index": 0 }]] },
-    "📦 构建抓取请求": { "main": [[{ "node": "🦉 内容抓取", "type": "main", "index": 0 }]] },
-    "🦉 内容抓取": { "main": [[{ "node": "🧹 内容清洗", "type": "main", "index": 0 }]] },
+    "📦 构建抓取请求": { "main": [[{ "node": "🔀 路由分流", "type": "main", "index": 0 }]] },
+    "🔀 路由分流": { "main": [[{ "node": "📡 RSS抓取", "type": "main", "index": 0 }], [{ "node": "🦉 网页抓取", "type": "main", "index": 0 }]] },
+    "📡 RSS抓取": { "main": [[{ "node": "🧹 内容清洗", "type": "main", "index": 0 }]] },
+    "🦉 网页抓取": { "main": [[{ "node": "🧹 内容清洗", "type": "main", "index": 0 }]] },
     "🧹 内容清洗": { "main": [[{ "node": "🧠 Newton Prompt", "type": "main", "index": 0 }]] },
     "🧠 Newton Prompt": { "main": [[{ "node": "🤖 DeepSeek 生成", "type": "main", "index": 0 }]] },
     "🤖 DeepSeek 生成": { "main": [[{ "node": "⚡ Midas 构建发布", "type": "main", "index": 0 }]] },

@@ -30,13 +30,13 @@ export default async function AdminPostsPage() {
     const authorMap = new Map()
     const subMap = new Map()
 
-    for (const id of authorIds) {
-      const u = await db.user.findFirst({ where: { id }, select: { id: true, username: true } })
-      if (u) authorMap.set(id, u)
+    if (authorIds.length > 0) {
+      const users = await db.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, username: true } })
+      for (const u of users) authorMap.set(u.id, u)
     }
-    for (const id of subIds) {
-      const s = await db.subreddit.findFirst({ where: { id }, select: { id: true, name: true } })
-      if (s) subMap.set(id, s)
+    if (subIds.length > 0) {
+      const subs = await db.subreddit.findMany({ where: { id: { in: subIds } }, select: { id: true, name: true } })
+      for (const s of subs) subMap.set(s.id, s)
     }
 
     enriched = (posts || []).map((p: any) => ({

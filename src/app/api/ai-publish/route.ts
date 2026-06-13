@@ -13,10 +13,65 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    const { title, content, subredditName, authorRole } =
+    const { title, content, subredditName, authorRole, contentHash, sourceId } =
       AIPublishValidator.parse(body)
 
-    // ── 2. 查找 AI 用户 ──────────────────────────────────────
+    // ── 2. 内容查重（三重保障）───────────────────────────────
+    // 2a. CrawlLog contentHash 命中（管道日志级去重）
+    if (contentHash) {
+      const recentLogs = (await db.crawlLog.findMany({
+        where: { contentHash, status: 'success' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      })) as any[]
+      if (recentLogs.length > 0) {
+        return new Response(
+          JSON.stringify({
+            duplicate: true,
+            existingPostId: recentLogs[0].postId || null,
+            reason: 'content_hash_match',
+            matchedAt: recentLogs[0].createdAt,
+          }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    }
+
+    // 2b. 已发布 Post 标题精确匹配（Posts 表级去重）
+    const postTitleDup = await db.post.findFirst({
+      where: { title },
+      select: { id: true },
+    })
+    if (postTitleDup) {
+      return new Response(
+        JSON.stringify({
+          duplicate: true,
+          existingPostId: (postTitleDup as any).id,
+          reason: 'post_title_match',
+        }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 2c. CrawlLog 标题精确匹配（跨次运行去重）
+    const titleDup = (await db.crawlLog.findMany({
+      where: { title, status: 'success' },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+    })) as any[]
+    if (titleDup.length > 0) {
+      return new Response(
+        JSON.stringify({
+          duplicate: true,
+          existingPostId: titleDup[0].postId || null,
+          reason: 'exact_title_match',
+          matchedAt: titleDup[0].createdAt,
+        }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ── 3. 查找 AI 用户 ──────────────────────────────────────
     console.log('[ai-publish] Looking for AI user:', authorRole)
     const aiAuthor = await db.user.findFirst({
       where: { aiRole: authorRole, isAI: true },
@@ -29,7 +84,7 @@ export async function POST(req: Request) {
     }
     console.log('[ai-publish] Found AI user:', (aiAuthor as any).id)
 
-    // ── 3. 查找/创建 Subreddit ──────────────────────────────
+    // ── 4. 查找/创建 Subreddit ──────────────────────────────
     console.log('[ai-publish] Looking for subreddit:', subredditName)
     let subreddit = await db.subreddit.findFirst({
       where: { name: subredditName },
@@ -44,7 +99,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // ── 4. 创建 Post ──────────────────────────────────────
+    // ── 5. 创建 Post ──────────────────────────────────────
     console.log('[ai-publish] Converting markdown...')
     const editorContent = markdownToEditorJS(content)
     console.log('[ai-publish] Creating post...')

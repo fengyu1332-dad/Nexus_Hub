@@ -1,131 +1,46 @@
-import { AIBadge } from '@/components/AIBadge'
-import { NewsletterSignup } from '@/components/NewsletterSignup'
 import { buttonVariants } from '@/components/ui/Button'
 import SortSelector from '@/components/SortSelector'
-import { db } from '@/lib/db'
-import { getAuthSession } from '@/lib/auth'
-import { getDictionary, getLocale } from '@/i18n'
-import type { DbPost, DbUser, DbSubreddit } from '@/lib/types'
-import { Home as HomeIcon } from 'lucide-react'
+import GeneralFeed from '@/components/homepage/GeneralFeed'
+import BoardSidebar from '@/components/BoardSidebar'
+import { NewsletterSignup } from '@/components/NewsletterSignup'
+import { getDictionary } from '@/i18n'
+import { Pencil } from 'lucide-react'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 export const dynamic = 'force-dynamic'
 
-type PostSummary = Pick<DbPost, 'id' | 'title' | 'createdAt' | 'authorId' | 'subredditId'> & {
-  author: Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>
-  subreddit: Pick<DbSubreddit, 'id' | 'name'>
-}
-
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined }
+}) {
   const dict = getDictionary()
-  const locale = getLocale()
-  let session = null
-  try {
-    session = await getAuthSession()
-  } catch {
-    // getAuthSession may fail during SSR on Vercel
-  }
-  let posts: PostSummary[] = []
-  let dbError: string | null = null
-
-  try {
-    const rawPosts = await db.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: { id: true, title: true, createdAt: true, authorId: true, subredditId: true },
-    }) as Pick<PostSummary, 'id' | 'title' | 'createdAt' | 'authorId' | 'subredditId'>[]
-
-    const subIds = [...new Set((rawPosts || []).map(p => p.subredditId).filter(Boolean))]
-    const subredditMap = new Map<string, Pick<DbSubreddit, 'id' | 'name'>>()
-    if (subIds.length > 0) {
-      const subs = await db.subreddit.findMany({
-        where: { id: { in: subIds } },
-        select: { id: true, name: true },
-      })
-      for (const s of subs || []) {
-        if (s) subredditMap.set(s.id, s as Pick<DbSubreddit, 'id' | 'name'>)
-      }
-    }
-
-    const authorIds = [...new Set((rawPosts || []).map(p => p.authorId).filter(Boolean))]
-    const authorMap = new Map<string, Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>>()
-    if (authorIds.length > 0) {
-      const users = await db.user.findMany({
-        where: { id: { in: authorIds } },
-        select: { id: true, username: true, isAI: true, aiRole: true },
-      })
-      for (const u of users || []) {
-        if (u) authorMap.set(u.id, u as Pick<DbUser, 'id' | 'username' | 'isAI' | 'aiRole'>)
-      }
-    }
-
-    posts = (rawPosts || []).map(p => ({
-      ...p,
-      subreddit: subredditMap.get(p.subredditId) || { id: '', name: 'Nexus' },
-      author: authorMap.get(p.authorId) || { id: '', username: 'Unknown', isAI: false, aiRole: null },
-    })) as PostSummary[]
-  } catch (e: unknown) {
-    dbError = e instanceof Error ? e.message : String(e)
-  }
+  const sort = (searchParams.sort as string) || 'new'
 
   return (
     <>
       <h1 className='font-bold text-3xl md:text-4xl'>{dict.home.nexusHub}</h1>
       <div className='grid grid-cols-1 md:grid-cols-3 gap-y-4 md:gap-x-4 py-6'>
         <div className='col-span-2 space-y-4'>
-          <SortSelector />
-          {dbError ? (
-            <div className='p-4 bg-red-50 rounded border border-red-200'>
-              <p className='font-semibold text-red-700'>{dict.home.dbError}</p>
-              <p className='text-sm text-red-500 mt-1'>{dbError}</p>
-            </div>
-          ) : posts.length === 0 ? (
-            <p className='text-zinc-500 p-4'>{dict.home.noPosts}</p>
-          ) : (
-            posts.map((p) => (
-              <div key={p.id} className='bg-white rounded p-4 border'>
-                <a
-                  href={`/r/${p.subreddit.name}/post/${p.id}`}
-                  className='font-semibold hover:text-orange-500'>
-                  {p.title}
-                </a>
-                <p className='text-xs text-zinc-400 mt-1'>
-                  r/{p.subreddit.name} · u/{p.author.username}
-                  {p.author.isAI && (
-                    <AIBadge aiRole={p.author.aiRole} />
-                  )} ·{' '}
-                  {new Date(p.createdAt).toLocaleDateString(locale)}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className='overflow-hidden h-fit rounded-lg border border-gray-200 order-first md:order-last'>
-          <div className='bg-emerald-100 px-6 py-4'>
-            <p className='font-semibold py-3 flex items-center gap-1.5'>
-              <HomeIcon className='h-4 w-4' />
-              {dict.home.home}
-            </p>
-          </div>
-          <dl className='-my-3 divide-y divide-gray-100 px-6 py-4 text-sm leading-6'>
-            <div className='flex justify-between gap-x-4 py-3'>
-              <p className='text-zinc-500'>
-                {dict.home.homeDescription}
-              </p>
-            </div>
-
+          <div className='flex items-center justify-between'>
+            <Suspense fallback={null}>
+              <SortSelector />
+            </Suspense>
             <Link
-              className={buttonVariants({
-                className: 'w-full mt-4 mb-6',
-              })}
-              href={`/r/create`}>
-              {dict.home.createCommunity}
+              href='/r/student-life/submit'
+              className={buttonVariants({ size: 'sm', className: 'gap-1.5' })}>
+              <Pencil className='h-4 w-4' />
+              {dict.user.createPost}
             </Link>
-          </dl>
+          </div>
+          <GeneralFeed sort={sort} />
         </div>
 
-        <NewsletterSignup />
+        <div className='order-first md:order-last space-y-4'>
+          <BoardSidebar />
+          <NewsletterSignup />
+        </div>
       </div>
     </>
   )

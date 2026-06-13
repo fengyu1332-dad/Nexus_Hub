@@ -11,6 +11,11 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
+    // Only admins can create communities
+    if (!(session.user as any).isAdmin) {
+      return new Response('Forbidden', { status: 403 })
+    }
+
     const body = await req.json()
     const { name } = SubredditValidator.parse(body)
 

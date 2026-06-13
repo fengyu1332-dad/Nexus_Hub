@@ -1,4 +1,4 @@
-import { AIBadge } from '@/components/AIBadge'
+
 import { UserAvatar } from '@/components/UserAvatar'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -139,8 +139,7 @@ export default async function UserProfilePage({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">u/{user.username}</h1>
-            {user.isAI && <AIBadge aiRole={user.aiRole} />}
-          </div>
+                      </div>
           {user.name && (
             <p className="text-zinc-500 mt-1">{user.name}</p>
           )}

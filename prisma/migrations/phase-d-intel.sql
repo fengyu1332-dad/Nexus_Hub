@@ -49,23 +49,25 @@ CREATE TABLE IF NOT EXISTS "PipelineConfig" (
 );
 
 -- Seed: global crawl interval default
-INSERT INTO "PipelineConfig" ("id", "key", "value")
+INSERT INTO "PipelineConfig" ("id", "key", "value", "updatedAt")
 VALUES (
   'cfg-global-interval',
   'global_crawl_interval',
-  '30'
+  '30',
+  now()
 ) ON CONFLICT DO NOTHING;
 
 -- Seed: night quiet hours
-INSERT INTO "PipelineConfig" ("id", "key", "value")
+INSERT INTO "PipelineConfig" ("id", "key", "value", "updatedAt")
 VALUES (
   'cfg-night-quiet',
   'night_quiet_hours',
-  '{"enabled": false, "startHour": 0, "endHour": 7}'
+  '{"enabled": false, "startHour": 0, "endHour": 7}',
+  now()
 ) ON CONFLICT DO NOTHING;
 
 -- Seed: Guardian Education source
-INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "contentSelector", "isActive")
+INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "contentSelector", "isActive", "createdAt", "updatedAt")
 VALUES (
   'seed-guardian-edu',
   'Guardian Education',
@@ -75,11 +77,13 @@ VALUES (
   'high',
   60,
   'article',
-  true
+  true,
+  now(),
+  now()
 ) ON CONFLICT DO NOTHING;
 
 -- Seed: THE World University News
-INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "isActive")
+INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "isActive", "createdAt", "updatedAt")
 VALUES (
   'seed-the-news',
   'THE University News',
@@ -88,11 +92,13 @@ VALUES (
   'general',
   'high',
   120,
-  true
+  true,
+  now(),
+  now()
 ) ON CONFLICT DO NOTHING;
 
 -- Seed: Inside Higher Ed
-INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "isActive")
+INSERT INTO "IntelSource" ("id", "label", "url", "type", "category", "priority", "crawlInterval", "isActive", "createdAt", "updatedAt")
 VALUES (
   'seed-inside-higher-ed',
   'Inside Higher Ed',
@@ -101,5 +107,46 @@ VALUES (
   'general',
   'medium',
   180,
-  true
+  true,
+  now(),
+  now()
 ) ON CONFLICT DO NOTHING;
+
+-- ═══════════════════════════════════════════════════════
+-- Phase D.2: Official Discussion Boards
+-- ═══════════════════════════════════════════════════════
+
+-- Add board metadata columns to Subreddit
+ALTER TABLE "Subreddit" ADD COLUMN IF NOT EXISTS "category" TEXT;
+ALTER TABLE "Subreddit" ADD COLUMN IF NOT EXISTS "description" TEXT;
+ALTER TABLE "Subreddit" ADD COLUMN IF NOT EXISTS "sortOrder" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Subreddit" ADD COLUMN IF NOT EXISTS "isOfficial" BOOLEAN NOT NULL DEFAULT false;
+
+-- Seed 15 official discussion boards (5 categories)
+INSERT INTO "Subreddit" ("id", "name", "category", "description", "sortOrder", "isOfficial", "creatorId", "createdAt", "updatedAt")
+VALUES
+  -- 📚 标化考试
+  ('board-sat-act',          'sat-act',          'exams',         'SAT/ACT备考、真题解析、提分策略、考位资讯', 1, true, NULL, now(), now()),
+  ('board-ap-olympiad',      'ap-olympiad',      'exams',         'AP选课与备考、AMC/BPhO/USACO等学科竞赛经验', 2, true, NULL, now(), now()),
+  ('board-alevel-ib',        'alevel-ib',        'exams',         'A-Level/IB选课策略、EE/TOK指导、全球统考动态', 3, true, NULL, now(), now()),
+  ('board-lang-exams',       'lang-exams',       'exams',         '托福/雅思/Duolingo/PTE备考交流与机经分享', 4, true, NULL, now(), now()),
+  -- 🎓 申请实战
+  ('board-school-select',    'school-select',    'applications',  '选校定位、录取数据分析、匹配度评估', 5, true, NULL, now(), now()),
+  ('board-essay-writing',    'essay-writing',    'applications',  '个人陈述、Why Essay、补充文书、活动列表打磨', 6, true, NULL, now(), now()),
+  ('board-app-strategy',     'app-strategy',     'applications',  'ED/EA/RD策略、推荐信、面试准备、Waitlist应对', 7, true, NULL, now(), now()),
+  ('board-bg-boost',         'bg-boost',         'applications',  '夏校申请、科研实习、竞赛辅导、课外活动规划', 8, true, NULL, now(), now()),
+  -- 🌍 院校洞见
+  ('board-us-undergrad',     'us-undergrad',     'insights',      '美国Top综合大学与文理学院深度解读', 9, true, NULL, now(), now()),
+  ('board-uk-commonwealth',  'uk-commonwealth',  'insights',      '牛津剑桥/IC/LSE/UCL及加拿大/澳洲名校', 10, true, NULL, now(), now()),
+  ('board-eu-asia',          'eu-asia',          'insights',      '欧陆/日本/新加坡/香港留学申请与院校动态', 11, true, NULL, now(), now()),
+  -- 🛂 签证与行前
+  ('board-visa-immigration', 'visa-immigration', 'visa',          'F1/学生签证/OPT/CPT/各国移民政策解读', 12, true, NULL, now(), now()),
+  ('board-pre-departure',    'pre-departure',    'visa',          '机票住宿/疫苗体检/银行开户/保险等行前准备', 13, true, NULL, now(), now()),
+  -- 💼 留学之后
+  ('board-career-jobs',      'career-jobs',      'career',        'CPT/OPT/H1B/回国求职/行业选择/校友内推', 14, true, NULL, now(), now()),
+  ('board-student-life',     'student-life',     'career',        '文化适应/社交/安全/心理健康/留学日常', 15, true, NULL, now(), now())
+ON CONFLICT ("name") DO UPDATE
+  SET "category"    = EXCLUDED."category",
+      "description" = EXCLUDED."description",
+      "sortOrder"   = EXCLUDED."sortOrder",
+      "isOfficial"  = EXCLUDED."isOfficial";

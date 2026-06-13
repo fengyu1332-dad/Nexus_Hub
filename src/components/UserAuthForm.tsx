@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import { signIn } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Icons } from './Icons'
 import { useDict } from '@/components/I18nProvider'
@@ -17,6 +17,14 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const dict = useDict()
+
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const err = p.get('error')
+    if (err === 'google') setError(dict.toast.googleLoginError)
+    else if (err === 'github') setError('GitHub 登录失败，请重试')
+    else if (err === 'CredentialsSignin') setError(dict.toast.invalidCredentials)
+  }, [dict])
 
   const loginWithProvider = async (provider: string) => {
     setIsLoading(provider)
@@ -33,28 +41,21 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
     e.preventDefault()
     setError('')
     setIsLoading('credentials')
-    try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-        callbackUrl: '/',
-      })
-      if (result?.error) {
-        setError(dict.toast.invalidCredentials || 'Invalid email or password')
-      } else if (result?.ok) {
-        window.location.href = '/'
-      }
-    } catch {
-      setError(dict.toast.googleLoginError)
-    } finally {
-      setIsLoading(null)
-    }
+    await signIn('credentials', {
+      email,
+      password,
+      callbackUrl: '/',
+    })
   }
 
   return (
     <div className={cn('flex flex-col gap-4', className)} {...props}>
-      {/* OAuth providers */}
+      {error && (
+        <p className='text-sm text-red-500 text-center bg-red-50 rounded-lg py-2 px-3'>
+          {error}
+        </p>
+      )}
+
       <Button
         isLoading={isLoading === 'google'}
         type='button'
@@ -118,7 +119,6 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
               className='w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:border-rose-400'
               required
             />
-            {error && <p className='text-sm text-red-500'>{error}</p>}
             <Button
               isLoading={isLoading === 'credentials'}
               type='submit'

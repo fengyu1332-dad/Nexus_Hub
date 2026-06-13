@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import Link from 'next/link'
-import { AIBadge } from '@/components/AIBadge'
+
 import { getDictionary, getLocale } from '@/i18n'
 import type { Metadata } from 'next'
 
@@ -166,7 +166,7 @@ export default async function SearchPage({
                 )}
                 <p className='text-xs text-zinc-400 mt-2'>
                   r/{p.subredditName} · u/{p.author.username}
-                  {p.author.isAI && <AIBadge aiRole={p.author.aiRole} />} ·{' '}
+                  ·{' '}
                   {new Date(p.createdAt).toLocaleDateString(locale)}
                 </p>
               </div>
