@@ -116,7 +116,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "jsonBody": "={{ $json.body }}",
         "options": {
           "timeout": 30000,
           "response": { "response": { "responseFormat": "string" } }
