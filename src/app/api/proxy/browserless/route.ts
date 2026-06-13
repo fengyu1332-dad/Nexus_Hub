@@ -28,8 +28,11 @@ export async function POST(req: Request) {
       const response = await fetch(browserlessUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: body.url }),
-        signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({
+          url: body.url,
+          gotoOptions: { timeout: 60000 },
+        }),
+        signal: AbortSignal.timeout(65000),
       })
       html = await response.text()
     } catch (fetchErr: any) {
