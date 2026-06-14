@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { Loader2, Trash2 } from 'lucide-react'
 import axios from 'axios'
+import { getDisplayName } from '@/lib/subreddit'
 
 interface Post {
   id: string
   title: string
   author: { username: string | null } | null
-  subreddit: { name: string } | null
+  subreddit: { name: string; displayName?: string | null } | null
   createdAt: string
 }
 
@@ -73,7 +74,7 @@ export function AdminPostsTable({
                     u/{post.author?.username || 'Unknown'}
                   </td>
                   <td className='px-4 py-2.5 text-zinc-500 hidden md:table-cell'>
-                    r/{(post.subreddit as any)?.name || '—'}
+                    r/{getDisplayName((post.subreddit as any)?.name || '—', (post.subreddit as any)?.displayName)}
                   </td>
                   <td className='px-4 py-2.5 text-right'>
                     <button

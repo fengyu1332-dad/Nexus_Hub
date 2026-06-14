@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       results.communities = await db.subreddit.findMany({
         where: { name: { startsWith: q } },
         include: { _count: true },
+        select: { id: true, name: true, displayName: true, _count: true },
         take: 5,
       })
     } catch {
@@ -104,19 +105,21 @@ export async function GET(req: Request) {
         if (u) authorMap.set(id, u)
       }
       for (const id of subIds) {
-        const s = await db.subreddit.findFirst({ where: { id }, select: { name: true } })
-        if (s) subMap.set(id, (s as any).name)
+        const s = await db.subreddit.findFirst({ where: { id }, select: { name: true, displayName: true } })
+        if (s) subMap.set(id, { name: (s as any).name, displayName: (s as any).displayName })
       }
 
       results.posts = matched.map((p: any) => {
         const excerpt = extractTextFromContent(p.content).substring(0, 200)
+        const sub = subMap.get(p.subredditId)
         return {
           id: p.id,
           title: p.title,
           excerpt,
           createdAt: p.createdAt,
           author: authorMap.get(p.authorId) || { username: 'Unknown' },
-          subredditName: subMap.get(p.subredditId) || 'Nexus',
+          subredditName: sub?.name || 'Nexus',
+          subredditDisplayName: sub?.displayName || sub?.name || 'Nexus',
         }
       })
     } catch {

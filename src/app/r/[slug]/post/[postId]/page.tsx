@@ -14,6 +14,7 @@ import { CachedPost } from '@/types/redis'
 import { Post, User, Vote } from '@prisma/client'
 import { ArrowBigDown, ArrowBigUp, Loader2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
+import { getDisplayName } from '@/lib/subreddit'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n'
@@ -60,9 +61,9 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
     }
     const sub = await db.subreddit.findFirst({
       where: { id: (post as any).subredditId },
-      select: { name: true },
+      select: { name: true, displayName: true },
     })
-    if (sub) subName = (sub as any).name
+    if (sub) subName = getDisplayName((sub as any).name, (sub as any).displayName)
   } catch { /* fallback */ }
 
   // Extract plain text description from EditorJS JSON

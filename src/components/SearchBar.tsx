@@ -18,11 +18,12 @@ import {
 import { useOnClickOutside } from '@/hooks/use-on-click-outside'
 import { FileText, Users } from 'lucide-react'
 import { useDict } from '@/components/I18nProvider'
+import { getDisplayName } from '@/lib/subreddit'
 
 interface SearchBarProps {}
 
 interface SearchResults {
-  communities: { id: string; name: string; _count?: { subscribers?: number } }[]
+  communities: { id: string; name: string; displayName?: string | null; _count?: { subscribers?: number } }[]
   posts: {
     id: string
     title: string
@@ -30,6 +31,7 @@ interface SearchResults {
     createdAt: string
     author: { username: string }
     subredditName: string
+    subredditDisplayName?: string
   }[]
 }
 
@@ -105,7 +107,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
                   key={sub.id}
                   value={sub.name}>
                   <Users className='mr-2 h-4 w-4' />
-                  <span>r/{sub.name}</span>
+                  <span>r/{getDisplayName(sub.name, sub.displayName)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -125,7 +127,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
                   <div className='flex flex-col'>
                     <span className='text-sm truncate'>{post.title}</span>
                     <span className='text-xs text-zinc-400'>
-                      r/{post.subredditName} · u/{post.author.username}
+                      r/{getDisplayName(post.subredditName, post.subredditDisplayName)} · u/{post.author.username}
                     </span>
                   </div>
                 </CommandItem>

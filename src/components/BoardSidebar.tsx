@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { getDisplayName } from '@/lib/subreddit'
 import Link from 'next/link'
 import { BookOpen, GraduationCap, Globe, Plane, Briefcase } from 'lucide-react'
 
@@ -24,7 +25,7 @@ export default async function BoardSidebar() {
     boards = await db.subreddit.findMany({
       where: { isOfficial: true },
       orderBy: { sortOrder: 'asc' },
-      select: { name: true, category: true, description: true },
+      select: { name: true, displayName: true, category: true, description: true },
     })
   } catch {
     // DB not ready — render empty sidebar
@@ -60,7 +61,7 @@ export default async function BoardSidebar() {
                   href={`/r/${b.name}`}
                   className='block rounded px-2 py-1.5 -mx-1 text-zinc-700 hover:bg-zinc-100 hover:text-orange-600 transition-colors'
                   title={b.description || ''}>
-                  r/{b.name}
+                  r/{getDisplayName(b.name, b.displayName)}
                 </Link>
               ))}
             </div>

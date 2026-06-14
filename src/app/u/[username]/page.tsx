@@ -3,6 +3,7 @@ import { UserAvatar } from '@/components/UserAvatar'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
+import { getDisplayName } from '@/lib/subreddit'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -64,9 +65,9 @@ export default async function UserProfilePage({
   for (const sid of subIds) {
     const sub = await db.subreddit.findFirst({
       where: { id: sid },
-      select: { name: true },
+      select: { name: true, displayName: true },
     })
-    if (sub) subMap.set(sid, (sub as any).name)
+    if (sub) subMap.set(sid, { name: (sub as any).name, displayName: (sub as any).displayName })
   }
 
   // Get comments
@@ -85,7 +86,8 @@ export default async function UserProfilePage({
       select: { title: true, subredditId: true },
     })
     if (p) {
-      const sn = subMap.get((p as any).subredditId) || 'Nexus'
+      const subData = subMap.get((p as any).subredditId)
+      const sn = subData?.name || 'Nexus'
       postMap.set(pid, { title: (p as any).title, subredditName: sn })
     }
   }
@@ -162,13 +164,13 @@ export default async function UserProfilePage({
               {posts.map((p: any) => (
                 <div key={p.id} className="bg-white rounded border p-4 hover:border-orange-300 transition-colors">
                   <Link
-                    href={`/r/${subMap.get(p.subredditId) || 'Nexus'}/post/${p.id}`}
+                    href={`/r/${subMap.get(p.subredditId)?.name || 'Nexus'}/post/${p.id}`}
                     className="font-medium hover:text-orange-500"
                   >
                     {p.title}
                   </Link>
                   <p className="text-xs text-zinc-400 mt-1">
-                    r/{subMap.get(p.subredditId) || 'Nexus'} ·{' '}
+                    r/{getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
                     {new Date(p.createdAt).toLocaleDateString(locale)}
                   </p>
                 </div>
@@ -221,13 +223,13 @@ export default async function UserProfilePage({
                   className="bg-white rounded border p-4 hover:border-amber-300 transition-colors"
                 >
                   <Link
-                    href={`/r/${subMap.get(p.subredditId) || 'Nexus'}/post/${p.id}`}
+                    href={`/r/${subMap.get(p.subredditId)?.name || 'Nexus'}/post/${p.id}`}
                     className="font-medium hover:text-orange-500"
                   >
                     {p.title}
                   </Link>
                   <p className="text-xs text-zinc-400 mt-1">
-                    r/{subMap.get(p.subredditId) || 'Nexus'} ·{' '}
+                    r/{getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
                     {new Date(p.createdAt).toLocaleDateString(locale)}
                   </p>
                 </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { getDisplayName } from '@/lib/subreddit'
 import { formatTimeToNow } from '@/lib/utils'
 import { Post, User, Vote } from '@prisma/client'
 import { MessageSquare } from 'lucide-react'
@@ -19,6 +20,7 @@ interface PostProps {
   }
   votesAmt: number
   subredditName: string
+  subredditDisplayName?: string | null
   currentVote?: PartialVote
   commentAmt: number
   savedPostIds?: string[]
@@ -29,6 +31,7 @@ const Post: FC<PostProps> = ({
   votesAmt: _votesAmt,
   currentVote: _currentVote,
   subredditName,
+  subredditDisplayName,
   commentAmt,
   savedPostIds,
 }) => {
@@ -51,7 +54,7 @@ const Post: FC<PostProps> = ({
                 <a
                   className='underline text-zinc-900 text-sm underline-offset-2'
                   href={`/r/${subredditName}`}>
-                  r/{subredditName}
+                  r/{getDisplayName(subredditName, subredditDisplayName)}
                 </a>
                 <span className='px-1'>•</span>
               </>

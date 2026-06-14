@@ -4,6 +4,7 @@ import SortSelector from '@/components/SortSelector'
 import { INFINITE_SCROLL_PAGINATION_RESULTS } from '@/config'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDisplayName } from '@/lib/subreddit'
 
 export const revalidate = 60
 import { notFound } from 'next/navigation'
@@ -23,14 +24,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const dict = getDictionary()
   const subreddit = await db.subreddit.findFirst({
     where: { name: params.slug },
-    select: { name: true },
+    select: { name: true, displayName: true },
   })
 
   if (!subreddit) return { title: dict.metadata.communityNotFound }
 
   return {
-    title: `r/${subreddit.name} — ${dict.metadata.titleSuffix}`,
-    description: `r/${subreddit.name}`,
+    title: `r/${getDisplayName(subreddit.name, (subreddit as any).displayName)} — ${dict.metadata.titleSuffix}`,
+    description: `r/${getDisplayName(subreddit.name, (subreddit as any).displayName)}`,
   }
 }
 
@@ -89,7 +90,7 @@ const page = async ({ params, searchParams }: PageProps) => {
   return (
     <>
       <h1 className='font-bold text-3xl md:text-4xl h-14'>
-        r/{subreddit.name}
+        r/{getDisplayName(subreddit.name, (subreddit as any).displayName)}
       </h1>
       <div className='mb-4'>
         <SortSelector />
@@ -98,6 +99,7 @@ const page = async ({ params, searchParams }: PageProps) => {
       <PostFeed
         initialPosts={subreddit.posts}
         subredditName={subreddit.name}
+        subredditDisplayName={(subreddit as any).displayName}
         sort={sort}
         savedPostIds={savedPostIds}
       />

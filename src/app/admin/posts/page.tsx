@@ -35,7 +35,7 @@ export default async function AdminPostsPage() {
       for (const u of users) authorMap.set(u.id, u)
     }
     if (subIds.length > 0) {
-      const subs = await db.subreddit.findMany({ where: { id: { in: subIds } }, select: { id: true, name: true } })
+      const subs = await db.subreddit.findMany({ where: { id: { in: subIds } }, select: { id: true, name: true, displayName: true } })
       for (const s of subs) subMap.set(s.id, s)
     }
 

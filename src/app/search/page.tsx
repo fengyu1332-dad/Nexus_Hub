@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import Link from 'next/link'
 
 import { getDictionary, getLocale } from '@/i18n'
+import { getDisplayName } from '@/lib/subreddit'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -54,6 +55,7 @@ export default async function SearchPage({
     communities = await db.subreddit.findMany({
       where: { name: { startsWith: q } },
       include: { _count: true },
+      select: { id: true, name: true, displayName: true, _count: true },
       take: 10,
     })
   } catch {
@@ -93,19 +95,21 @@ export default async function SearchPage({
       if (u) authorMap.set(id, u)
     }
     for (const id of subIds) {
-      const s = await db.subreddit.findFirst({ where: { id }, select: { name: true } })
-      if (s) subMap.set(id, (s as any).name)
+      const s = await db.subreddit.findFirst({ where: { id }, select: { name: true, displayName: true } })
+      if (s) subMap.set(id, { name: (s as any).name, displayName: (s as any).displayName })
     }
 
     postResults = matched.map((p: any) => {
       const excerpt = extractTextFromContent(p.content).substring(0, 300)
+      const sub = subMap.get(p.subredditId)
       return {
         id: p.id,
         title: p.title,
         excerpt,
         createdAt: p.createdAt,
         author: authorMap.get(p.authorId) || { username: 'Unknown', isAI: false, aiRole: null },
-        subredditName: subMap.get(p.subredditId) || 'Nexus',
+        subredditName: sub?.name || 'Nexus',
+        subredditDisplayName: sub?.displayName || sub?.name || 'Nexus',
       }
     })
   } catch {
@@ -131,7 +135,7 @@ export default async function SearchPage({
                 href={`/r/${c.name}`}
                 className='block bg-white rounded border p-4 hover:border-orange-300 transition-colors'
               >
-                <span className='font-medium'>r/{c.name}</span>
+                <span className='font-medium'>r/{getDisplayName(c.name, c.displayName)}</span>
                 {c._count?.subscribers !== undefined && (
                   <span className='text-xs text-zinc-400 ml-2'>
                     {c._count.subscribers} {dict.search.subscribers}
@@ -165,7 +169,7 @@ export default async function SearchPage({
                   <p className='text-sm text-zinc-500 mt-2 line-clamp-2'>{p.excerpt}</p>
                 )}
                 <p className='text-xs text-zinc-400 mt-2'>
-                  r/{p.subredditName} · u/{p.author.username}
+                  r/{getDisplayName(p.subredditName, p.subredditDisplayName)} · u/{p.author.username}
                   ·{' '}
                   {new Date(p.createdAt).toLocaleDateString(locale)}
                 </p>

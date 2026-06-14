@@ -3,6 +3,7 @@ import ToFeedButton from '@/components/ToFeedButton'
 import { buttonVariants } from '@/components/ui/Button'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getDisplayName } from '@/lib/subreddit'
 import { getDictionary } from '@/i18n'
 import { format } from 'date-fns'
 import type { Metadata } from 'next'
@@ -88,7 +89,7 @@ const Layout = async ({
           <div className='overflow-hidden h-fit rounded-lg border border-gray-200 order-first md:order-last'>
             <div className='px-6 py-4'>
               <p className='font-semibold py-3'>
-                {dict.community.about} r/{subreddit.name}
+                {dict.community.about} r/{getDisplayName(subreddit.name, (subreddit as any).displayName)}
               </p>
             </div>
             <dl className='divide-y divide-gray-100 px-6 py-4 text-sm leading-6 bg-white'>
@@ -117,6 +118,7 @@ const Layout = async ({
                   isSubscribed={isSubscribed}
                   subredditId={subreddit.id}
                   subredditName={subreddit.name}
+                  subredditDisplayName={(subreddit as any).displayName}
                 />
               ) : null}
               <Link

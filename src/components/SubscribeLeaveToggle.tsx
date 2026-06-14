@@ -8,18 +8,22 @@ import { startTransition } from 'react'
 import { useToast } from '../hooks/use-toast'
 import { useCustomToasts } from '@/hooks/use-custom-toasts'
 import { useDict } from '@/components/I18nProvider'
+import { getDisplayName } from '@/lib/subreddit'
 
 interface SubscribeLeaveToggleProps {
   isSubscribed: boolean
   subredditId: string
   subredditName: string
+  subredditDisplayName?: string | null
 }
 
 const SubscribeLeaveToggle = ({
   isSubscribed,
   subredditId,
   subredditName,
+  subredditDisplayName,
 }: SubscribeLeaveToggleProps) => {
+  const displayName = getDisplayName(subredditName, subredditDisplayName)
   const { toast } = useToast()
   const { loginToast } = useCustomToasts()
   const router = useRouter()
@@ -53,7 +57,7 @@ const SubscribeLeaveToggle = ({
       })
       toast({
         title: dict.toast.subscribed,
-        description: `${dict.toast.subscribedTo} r/${subredditName}`,
+        description: `${dict.toast.subscribedTo} r/${displayName}`,
       })
     },
   })
@@ -80,7 +84,7 @@ const SubscribeLeaveToggle = ({
       })
       toast({
         title: dict.toast.unsubscribed,
-        description: `${dict.toast.unsubscribedFrom} r/${subredditName}`,
+        description: `${dict.toast.unsubscribedFrom} r/${displayName}`,
       })
     },
   })

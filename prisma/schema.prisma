@@ -72,6 +72,7 @@ model User {
 model Subreddit {
   id          String   @id @default(cuid())
   name        String   @unique
+  displayName String?   // 中文显示名（如 "SAT/ACT 备考"），保留 name 用于 URL slug
   category    String?   // "exams" | "applications" | "insights" | "visa" | "career"
   description String?   @db.Text
   sortOrder   Int      @default(0)
