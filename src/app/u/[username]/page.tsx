@@ -4,6 +4,7 @@ import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
 import { getDisplayName } from '@/lib/subreddit'
+import { AIBadge } from '@/components/AIBadge'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -141,7 +142,8 @@ export default async function UserProfilePage({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">u/{user.username}</h1>
-                      </div>
+            {user.isAI && <AIBadge aiRole={user.aiRole} />}
+          </div>
           {user.name && (
             <p className="text-zinc-500 mt-1">{user.name}</p>
           )}

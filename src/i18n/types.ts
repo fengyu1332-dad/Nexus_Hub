@@ -230,6 +230,7 @@ export interface Dictionary {
     aiAgents: string
     aiDashboard: string
     intelSources: string
+    newsletter: string
     systemStatus: string
     totalUsers: string
     totalPosts: string

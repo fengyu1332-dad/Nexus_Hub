@@ -247,6 +247,7 @@ export const zhCN: Dictionary = {
     unhealthy: '异常',
     aiDashboard: 'AI 仪表盘',
     intelSources: '情报源管理',
+    newsletter: 'Newsletter',
     workflowActive: '活跃',
     workflowInactive: '暂停',
     executeNow: '立即执行',

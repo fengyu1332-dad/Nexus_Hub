@@ -19,6 +19,7 @@ export default async function AdminLayout({
     aiAgents: dict.admin.aiAgents,
     aiDashboard: dict.admin.aiDashboard,
     intelSources: dict.admin.intelSources,
+    newsletter: dict.admin.newsletter,
     systemStatus: dict.admin.systemStatus,
     backToSite: dict.admin.backToSite,
   }

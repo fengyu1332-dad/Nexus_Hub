@@ -247,6 +247,7 @@ export const en: Dictionary = {
     unhealthy: 'Unhealthy',
     aiDashboard: 'AI Dashboard',
     intelSources: 'Intel Sources',
+    newsletter: 'Newsletter',
     workflowActive: 'Active',
     workflowInactive: 'Inactive',
     executeNow: 'Execute Now',

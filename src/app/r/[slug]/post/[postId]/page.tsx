@@ -15,6 +15,7 @@ import { Post, User, Vote } from '@prisma/client'
 import { ArrowBigDown, ArrowBigUp, Loader2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { getDisplayName } from '@/lib/subreddit'
+import { AIBadge } from '@/components/AIBadge'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n'
@@ -184,7 +185,8 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
                 href={`/u/${post?.author.username ?? cachedPost?.authorUsername}`}
                 className='underline hover:text-orange-500'>
                 u/{post?.author.username ?? cachedPost?.authorUsername}
-              </Link>{' '}
+              </Link>
+              {(post?.author as any)?.isAI && <AIBadge aiRole={(post?.author as any)?.aiRole} />}
               {' '}
               {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
             </p>

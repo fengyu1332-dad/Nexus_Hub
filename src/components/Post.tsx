@@ -9,6 +9,7 @@ import { FC, useRef } from 'react'
 import EditorOutput from './EditorOutput'
 import PostVoteClient from './post-vote/PostVoteClient'
 import BookmarkButton from './BookmarkButton'
+import { AIBadge } from './AIBadge'
 import { useI18n } from '@/components/I18nProvider'
 
 type PartialVote = Pick<Vote, 'type'>
@@ -64,7 +65,9 @@ const Post: FC<PostProps> = ({
               href={`/u/${post.author.username}`}
               className='underline text-zinc-900 text-sm underline-offset-2 hover:text-orange-500'>
               u/{post.author.username}
-            </Link>{' '}
+            </Link>
+            {post.author.isAI && <AIBadge aiRole={post.author.aiRole} />}
+            {' '}
             <span
               className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                 _votesAmt >= 3

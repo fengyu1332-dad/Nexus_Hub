@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { FC, useRef, useState } from 'react'
 import CommentVotes from '../CommentVotes'
 import { UserAvatar } from '../UserAvatar'
+import { AIBadge } from '../AIBadge'
 
 import { Button } from '../ui/Button'
 import { Label } from '../ui/Label'
@@ -90,7 +91,8 @@ const PostComment: FC<PostCommentProps> = ({
               className='hover:text-orange-500'>
               u/{comment.author.username}
             </Link>
-                      </p>
+            {comment.author.isAI && <AIBadge aiRole={comment.author.aiRole} />}
+          </p>
 
           <p className='max-h-40 truncate text-xs text-zinc-500'>
             {formatTimeToNow(new Date(comment.createdAt), locale)}
