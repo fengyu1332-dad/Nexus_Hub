@@ -301,9 +301,9 @@ export function FloraChat({ dict }: { dict: Dictionary }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className='fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-200 hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center group'
+        className='fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-200 hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center group max-sm:bottom-4 max-sm:right-4 max-sm:w-12 max-sm:h-12'
         title={dict.flora.title}>
-        <Flower2 className='h-6 w-6 group-hover:animate-bounce' />
+        <Flower2 className='h-6 w-6 max-sm:h-5 max-sm:w-5 group-hover:animate-bounce' />
         {/* Unread dot */}
         <span className='absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white animate-pulse' />
       </button>
@@ -314,8 +314,15 @@ export function FloraChat({ dict }: { dict: Dictionary }) {
   return (
     <div
       className={cn(
-        'fixed bottom-5 right-5 z-50 flex flex-col bg-white rounded-2xl shadow-2xl border border-zinc-200 overflow-hidden transition-all duration-300',
-        isMinimized ? 'w-72 h-14' : 'w-[380px] h-[560px] max-h-[calc(100vh-40px)]'
+        'fixed z-50 flex flex-col bg-white shadow-2xl border border-zinc-200 overflow-hidden transition-all duration-300',
+        // Desktop sizing
+        'bottom-5 right-5 rounded-2xl',
+        isMinimized
+          ? 'w-72 h-14'
+          : 'w-[380px] h-[560px] max-h-[calc(100vh-40px)]',
+        // Mobile sizing — fullscreen when expanded, bottom bar when minimized
+        !isMinimized && 'max-sm:inset-0 max-sm:rounded-none max-sm:w-full max-sm:h-full max-sm:max-h-none',
+        isMinimized && 'max-sm:inset-x-2 max-sm:bottom-2 max-sm:w-auto max-sm:h-12 max-sm:rounded-xl'
       )}>
       {/* ── Header ─────────────────────────────────────── */}
       <div className='flex-shrink-0 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-rose-400 to-pink-500 text-white'>

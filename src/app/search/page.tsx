@@ -49,25 +49,31 @@ export default async function SearchPage({
     )
   }
 
-  // Search communities
+  // Search communities — match both name (slug) and displayName (Chinese)
   let communities: any[] = []
   try {
-    communities = await db.subreddit.findMany({
-      where: { name: { startsWith: q } },
+    const allCommunities = await db.subreddit.findMany({
       include: { _count: true },
       select: { id: true, name: true, displayName: true, _count: true },
-      take: 10,
+      take: 50,
     })
+    communities = (allCommunities || [])
+      .filter((c: any) => {
+        const name = (c.name || '').toLowerCase()
+        const display = (c.displayName || '').toLowerCase()
+        return name.includes(keyword) || display.includes(keyword)
+      })
+      .slice(0, 10)
   } catch {
     communities = []
   }
 
-  // Search posts
+  // Search posts — score by title match > content match
   let postResults: any[] = []
   try {
     const allPosts = await db.post.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: 100,
       select: {
         id: true,
         title: true,
@@ -79,11 +85,16 @@ export default async function SearchPage({
     })
 
     const matched = (allPosts || [])
-      .filter((p: any) => {
+      .map((p: any) => {
         const title = (p.title || '').toLowerCase()
-        const body = extractTextFromContent(p.content).toLowerCase()
-        return title.includes(keyword) || body.includes(keyword)
+        const body = extractTextFromContent(p.content || '').toLowerCase()
+        let score = 0
+        if (title.includes(keyword)) score += 10
+        if (body.includes(keyword)) score += 1
+        return { ...p, _score: score }
       })
+      .filter((p: any) => p._score > 0)
+      .sort((a: any, b: any) => b._score - a._score)
       .slice(0, 20)
 
     const authorIds = [...new Set(matched.map((p: any) => p.authorId).filter(Boolean))]

@@ -36,6 +36,11 @@ function checkSearchLimit(ip: string): { allowed: boolean; remaining: number } {
   return { allowed: true, remaining: 30 - entry.count }
 }
 
+function matchQuery(text: string, query: string): boolean {
+  // Case-insensitive matching for both Chinese and English
+  return text.toLowerCase().includes(query.toLowerCase())
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const q = url.searchParams.get('q')
@@ -55,15 +60,24 @@ export async function GET(req: Request) {
 
   const results: any = { communities: [], posts: [] }
 
-  // Search communities (always)
+  // Search communities — match both name (slug) and displayName (Chinese)
   if (type === 'communities' || type === 'all') {
     try {
-      results.communities = await db.subreddit.findMany({
-        where: { name: { startsWith: q } },
+      // Fetch all official + popular communities for client-side matching
+      const allCommunities = await db.subreddit.findMany({
         include: { _count: true },
         select: { id: true, name: true, displayName: true, _count: true },
-        take: 5,
+        take: 50,
       })
+
+      results.communities = (allCommunities || [])
+        .filter((c: any) => {
+          const name = (c.name || '').toLowerCase()
+          const display = (c.displayName || '').toLowerCase()
+          const query = q.toLowerCase()
+          return name.includes(query) || display.includes(query)
+        })
+        .slice(0, 5)
     } catch {
       results.communities = []
     }
@@ -72,10 +86,9 @@ export async function GET(req: Request) {
   // Search posts by title + content
   if (type === 'posts' || type === 'all') {
     try {
-      const keyword = q.toLowerCase()
       const allPosts = await db.post.findMany({
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: 100,
         select: {
           id: true,
           title: true,
@@ -86,18 +99,23 @@ export async function GET(req: Request) {
         },
       })
 
-      // Filter in memory
-      const matched = (allPosts || [])
-        .filter((p: any) => {
-          const title = (p.title || '').toLowerCase()
-          const body = extractTextFromContent(p.content).toLowerCase()
-          return title.includes(keyword) || body.includes(keyword)
+      // Score and rank: title match > content match, then by recency
+      const scored = (allPosts || [])
+        .map((p: any) => {
+          const title = p.title || ''
+          const body = extractTextFromContent(p.content || '')
+          let score = 0
+          if (matchQuery(title, q)) score += 10
+          if (matchQuery(body, q)) score += 1
+          return { ...p, _score: score }
         })
+        .filter((p: any) => p._score > 0)
+        .sort((a: any, b: any) => b._score - a._score)
         .slice(0, 8)
 
       // Resolve authors and subreddits
-      const authorIds = [...new Set(matched.map((p: any) => p.authorId).filter(Boolean))]
-      const subIds = [...new Set(matched.map((p: any) => p.subredditId).filter(Boolean))]
+      const authorIds = [...new Set(scored.map((p: any) => p.authorId).filter(Boolean))]
+      const subIds = [...new Set(scored.map((p: any) => p.subredditId).filter(Boolean))]
       const authorMap = new Map()
       const subMap = new Map()
       for (const id of authorIds) {
@@ -109,7 +127,7 @@ export async function GET(req: Request) {
         if (s) subMap.set(id, { name: (s as any).name, displayName: (s as any).displayName })
       }
 
-      results.posts = matched.map((p: any) => {
+      results.posts = scored.map((p: any) => {
         const excerpt = extractTextFromContent(p.content).substring(0, 200)
         const sub = subMap.get(p.subredditId)
         return {

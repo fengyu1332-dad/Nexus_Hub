@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react'
 interface PostFeedProps {
   initialPosts: ExtendedPost[]
   subredditName?: string
+  subredditDisplayName?: string | null
   sort?: string
   savedPostIds?: string[]
 }

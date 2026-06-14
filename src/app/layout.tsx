@@ -46,7 +46,7 @@ export default function RootLayout({
         <Providers dictZhCN={zhCN} dictEn={en} initialLocale={locale}>
           <Navbar />
           {authModal}
-          <div className='container max-w-7xl mx-auto h-full pt-12'>
+          <div className='container max-w-7xl mx-auto h-full pt-4 sm:pt-12 px-3 sm:px-6'>
             <ErrorBoundary fallbackMessage={dict.errorPage.fallbackMessage}>{children}</ErrorBoundary>
           </div>
         </Providers>
