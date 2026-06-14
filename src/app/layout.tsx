@@ -1,6 +1,7 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FloraChat } from '@/components/FloraChat'
 import Navbar from '@/components/Navbar'
+import WeChatShare from '@/components/WeChatShare'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -19,9 +20,38 @@ export const dynamic = 'force-dynamic'
 export async function generateMetadata(): Promise<Metadata> {
   const locale = getLocale()
   const dict = locale === 'en' ? en : zhCN
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app'
   return {
-    title: `${dict.metadata.siteName} — ${dict.metadata.tagline}`,
+    metadataBase: new URL(baseUrl),
+    title: {
+      default: `${dict.metadata.siteName} — ${dict.metadata.tagline}`,
+      template: `%s | ${dict.metadata.titleSuffix}`,
+    },
     description: dict.metadata.description,
+    openGraph: {
+      type: 'website',
+      siteName: dict.metadata.siteName,
+      title: `${dict.metadata.siteName} — ${dict.metadata.tagline}`,
+      description: dict.metadata.description,
+      url: baseUrl,
+      locale: locale === 'en' ? 'en_US' : 'zh_CN',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${dict.metadata.siteName} — ${dict.metadata.tagline}`,
+      description: dict.metadata.description,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   }
 }
 
@@ -51,6 +81,10 @@ export default function RootLayout({
           </div>
         </Providers>
         <Toaster />
+        <WeChatShare
+          title={dict.metadata.siteName}
+          description={dict.metadata.description}
+        />
         <FloraChat dict={dict} />
       </body>
     </html>

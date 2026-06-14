@@ -7,6 +7,7 @@ import axios from 'axios'
 import { cn } from '@/lib/utils'
 import { useDict } from '@/components/I18nProvider'
 import { useCustomToasts } from '@/hooks/use-custom-toasts'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface BookmarkButtonProps {
   postId: string
@@ -19,14 +20,22 @@ const BookmarkButton = ({ postId, initialSaved }: BookmarkButtonProps) => {
   const [saved, setSaved] = useState(initialSaved)
 
   const { mutate: toggle } = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ action }: { action: 'save' | 'unsave' }) => {
       await axios.patch('/api/bookmark', { postId })
     },
-    onMutate: () => {
-      setSaved((prev) => !prev)
+    onMutate: ({ action }) => {
+      setSaved(action === 'save')
     },
-    onError: (err: any) => {
-      setSaved((prev) => !prev) // rollback
+    onSuccess: (_, { action }) => {
+      trackEvent(
+        action === 'save'
+          ? AnalyticsEvent.POST_BOOKMARKED
+          : AnalyticsEvent.POST_UNBOOKMARKED,
+        { postId }
+      )
+    },
+    onError: (err: any, { action }) => {
+      setSaved(action !== 'save') // rollback
       if (err?.response?.status === 401) {
         return loginToast()
       }
@@ -38,7 +47,7 @@ const BookmarkButton = ({ postId, initialSaved }: BookmarkButtonProps) => {
       onClick={(e) => {
         e.preventDefault()
         e.stopPropagation()
-        toggle()
+        toggle({ action: saved ? 'unsave' : 'save' })
       }}
       className='p-1.5 rounded-md hover:bg-zinc-100 transition-colors'
       title={saved ? dict.bookmark.unsave : dict.bookmark.save}>

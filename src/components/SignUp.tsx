@@ -7,6 +7,7 @@ import UserAuthForm from '@/components/UserAuthForm'
 import { Button } from '@/components/ui/Button'
 import { useDict } from '@/components/I18nProvider'
 import { useToast } from '@/hooks/use-toast'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 import Link from 'next/link'
 
 const SignUp = () => {
@@ -28,6 +29,7 @@ const SignUp = () => {
         body: JSON.stringify({ email, username, password }),
       })
       if (res.ok) {
+        trackEvent(AnalyticsEvent.SIGN_UP, { provider: 'credentials', username })
         toast({ title: dict.toast.registered, description: dict.toast.registeredDescription })
         router.push('/sign-in')
       } else if (res.status === 409) {

@@ -12,6 +12,7 @@ import { FC, useState } from 'react'
 import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { useDict } from '@/components/I18nProvider'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface CreateCommentProps {
   postId: string
@@ -48,7 +49,11 @@ const CreateComment: FC<CreateCommentProps> = ({ postId, replyToId }) => {
         variant: 'destructive',
       })
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      trackEvent(AnalyticsEvent.COMMENT_CREATED, {
+        postId: variables.postId,
+        replyToId: variables.replyToId || null,
+      })
       router.refresh()
       setInput('')
     },

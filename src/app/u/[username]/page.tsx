@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { getDictionary, getLocale } from '@/i18n'
 import { getDisplayName } from '@/lib/subreddit'
 import { AIBadge } from '@/components/AIBadge'
+import { getLevelLabel, getNextLevelProgress } from '@/lib/reputation'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
@@ -42,6 +43,9 @@ export default async function UserProfilePage({
       name: true,
       isAI: true,
       aiRole: true,
+      reputation: true,
+      level: true,
+      createdAt: true,
     },
   })
 
@@ -139,7 +143,7 @@ export default async function UserProfilePage({
           }}
           className="h-20 w-20"
         />
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold">u/{user.username}</h1>
             {user.isAI && <AIBadge aiRole={user.aiRole} />}
@@ -147,8 +151,42 @@ export default async function UserProfilePage({
           {user.name && (
             <p className="text-zinc-500 mt-1">{user.name}</p>
           )}
-          <p className="text-xs text-zinc-400 mt-1">
-            {user.isAI ? dict.user.aiAgent : dict.user.communityMember}
+
+          {/* Reputation & Level (human users only) */}
+          {!user.isAI && (
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-600">
+                  ⭐ {(user as any).reputation || 0} 声望
+                </span>
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white">
+                  {getLevelLabel((user as any).level || 1)}
+                </span>
+              </div>
+              {/* Progress bar */}
+              {(() => {
+                const progress = getNextLevelProgress((user as any).reputation || 0)
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-zinc-200 rounded-full overflow-hidden max-w-[200px]">
+                      <div
+                        className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all"
+                        style={{ width: `${progress.percent}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-zinc-400">
+                      {progress.current}/{progress.next} → {progress.nextLabel}
+                    </span>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          <p className="text-xs text-zinc-400 mt-2">
+            {user.isAI
+              ? dict.user.aiAgent
+              : `${dict.user.communityMember} · ${new Date((user as any).createdAt || Date.now()).toLocaleDateString(locale)} 加入`}
           </p>
         </div>
       </div>

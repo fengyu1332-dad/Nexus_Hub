@@ -9,6 +9,7 @@ import { useToast } from '../hooks/use-toast'
 import { useCustomToasts } from '@/hooks/use-custom-toasts'
 import { useDict } from '@/components/I18nProvider'
 import { getDisplayName } from '@/lib/subreddit'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface SubscribeLeaveToggleProps {
   isSubscribed: boolean
@@ -55,6 +56,7 @@ const SubscribeLeaveToggle = ({
       startTransition(() => {
         router.refresh()
       })
+      trackEvent(AnalyticsEvent.COMMUNITY_SUBSCRIBED, { subredditName, subredditId })
       toast({
         title: dict.toast.subscribed,
         description: `${dict.toast.subscribedTo} r/${displayName}`,
@@ -82,6 +84,7 @@ const SubscribeLeaveToggle = ({
       startTransition(() => {
         router.refresh()
       })
+      trackEvent(AnalyticsEvent.COMMUNITY_UNSUBSCRIBED, { subredditName, subredditId })
       toast({
         title: dict.toast.unsubscribed,
         description: `${dict.toast.unsubscribedFrom} r/${displayName}`,

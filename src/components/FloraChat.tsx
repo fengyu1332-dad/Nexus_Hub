@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Flower2, Send, X, Minimize2, Maximize2, Loader2, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Dictionary } from '@/i18n/types'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export function FloraChat({ dict }: { dict: Dictionary }) {
         content: m.content.substring(0, 1000),
       }))
 
+    trackEvent(AnalyticsEvent.FLORA_CHAT_MESSAGE, { messageLength: text.length })
     setMessages((prev) => [...prev, userMsg])
     setInput('')
     setIsStreaming(true)

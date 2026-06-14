@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n'
 import type { Metadata } from 'next'
+import WeChatShare from '@/components/WeChatShare'
 
 interface SubRedditPostPageProps {
   params: {
@@ -35,11 +36,13 @@ export const fetchCache = 'force-no-store'
 
 export async function generateMetadata({ params }: SubRedditPostPageProps): Promise<Metadata> {
   const dict = getDictionary()
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app'
   const post = await db.post.findFirst({
     where: { id: params.postId },
     select: {
       title: true,
       content: true,
+      createdAt: true,
       authorId: true,
       subredditId: true,
     },
@@ -47,8 +50,9 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
 
   if (!post) return { title: dict.metadata.postNotFound }
 
-  // Resolve author and subreddit manually (compatible with Supabase REST)
+  // Resolve author and subreddit
   let authorLabel = 'Unknown'
+  let authorUsername = 'unknown'
   let subName = 'Nexus'
   try {
     const author = await db.user.findFirst({
@@ -56,9 +60,10 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
       select: { username: true, isAI: true, aiRole: true },
     })
     if (author) {
+      authorUsername = (author as any).username || 'unknown'
       authorLabel = (author as any).isAI
         ? `AI-${(author as any).aiRole || ''}`
-        : `u/${(author as any).username}`
+        : `u/${authorUsername}`
     }
     const sub = await db.subreddit.findFirst({
       where: { id: (post as any).subredditId },
@@ -67,7 +72,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
     if (sub) subName = getDisplayName((sub as any).name, (sub as any).displayName)
   } catch { /* fallback */ }
 
-  // Extract plain text description from EditorJS JSON
+  // Extract plain text description
   let description = ''
   try {
     const content = (post as any).content
@@ -84,20 +89,31 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
     description = (post as any).title
   }
 
+  const postUrl = `${baseUrl}/r/${params.slug}/post/${params.postId}`
+  const ogImage = `${baseUrl}/og.png` // Use a site-wide OG image fallback
+
   return {
     title: `${(post as any).title} — r/${subName} | ${dict.metadata.titleSuffix}`,
     description: `${authorLabel} · ${description}`,
+    alternates: {
+      canonical: postUrl,
+    },
     openGraph: {
       title: (post as any).title,
       description: `${authorLabel} · ${description}`,
       type: 'article',
-      publishedTime: undefined,
+      publishedTime: (post as any).createdAt?.toISOString(),
+      modifiedTime: (post as any).createdAt?.toISOString(),
       authors: [authorLabel],
+      url: postUrl,
+      images: [ogImage],
+      siteName: dict.metadata.siteName,
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: (post as any).title,
       description: `${authorLabel} · ${description}`,
+      images: [ogImage],
     },
   }
 }
@@ -195,6 +211,39 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
           <h1 className='text-xl font-semibold py-2 leading-6 text-gray-900'>
             {post?.title ?? cachedPost?.title}
           </h1>
+
+          <WeChatShare
+            title={post?.title ?? cachedPost?.title ?? ''}
+            description={
+              (post?.title ?? cachedPost?.title ?? '').slice(0, 60)
+            }
+          />
+          {/* JSON-LD Article Structured Data */}
+          <script
+            type='application/ld+json'
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                '@context': 'https://schema.org',
+                '@type': 'Article',
+                headline: post?.title ?? cachedPost?.title,
+                author: {
+                  '@type': 'Person',
+                  name: post?.author?.username ?? cachedPost?.authorUsername ?? 'Unknown',
+                },
+                datePublished: post?.createdAt ?? cachedPost?.createdAt,
+                dateModified: post?.createdAt ?? cachedPost?.createdAt,
+                publisher: {
+                  '@type': 'Organization',
+                  name: 'Nexus Hub',
+                  url: process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app',
+                },
+                mainEntityOfPage: {
+                  '@type': 'WebPage',
+                  '@id': `${process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app'}/r/${params.slug}/post/${params.postId}`,
+                },
+              }),
+            }}
+          />
 
           <InlineMathProcessor>
             <EditorOutput content={post?.content ?? cachedPost?.content} />

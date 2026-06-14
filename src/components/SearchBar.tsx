@@ -19,6 +19,7 @@ import { useOnClickOutside } from '@/hooks/use-on-click-outside'
 import { FileText, Users } from 'lucide-react'
 import { useDict } from '@/components/I18nProvider'
 import { getDisplayName } from '@/lib/subreddit'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface SearchBarProps {}
 
@@ -47,6 +48,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
   })
 
   const request = debounce(async () => {
+    trackEvent(AnalyticsEvent.SEARCH_PERFORMED, { query: input })
     refetch()
   }, 300)
 

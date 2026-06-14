@@ -12,6 +12,7 @@ import { Button } from '../ui/Button'
 import { ArrowBigDown, ArrowBigUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDict } from '@/components/I18nProvider'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface PostVoteClientProps {
   postId: string
@@ -62,6 +63,9 @@ const PostVoteClient = ({
         description: dict.toast.voteNotRegistered,
         variant: 'destructive',
       })
+    },
+    onSuccess: (_, voteType) => {
+      trackEvent(AnalyticsEvent.VOTE_CAST, { targetType: 'post', postId, voteType })
     },
     onMutate: (type: VoteType) => {
       if (currentVote === type) {

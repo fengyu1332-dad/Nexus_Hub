@@ -14,6 +14,7 @@ import { PostCreationRequest, PostValidator } from '@/lib/validators/post'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
 import { useDict } from '@/components/I18nProvider'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 import '@/styles/editor.css'
 
@@ -60,7 +61,11 @@ export const Editor: React.FC<EditorProps> = ({ subredditId }) => {
         variant: 'destructive',
       })
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      trackEvent(AnalyticsEvent.POST_CREATED, {
+        subredditId: variables.subredditId,
+        title: variables.title,
+      })
       // turn pathname /r/mycommunity/submit into /r/mycommunity
       const newPathname = pathname.split('/').slice(0, -1).join('/')
       router.push(newPathname)

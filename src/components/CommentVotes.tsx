@@ -11,6 +11,7 @@ import axios, { AxiosError } from 'axios'
 import { ArrowBigDown, ArrowBigUp } from 'lucide-react'
 import { FC, useState } from 'react'
 import { useDict } from '@/components/I18nProvider'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface CommentVotesProps {
   commentId: string
@@ -60,6 +61,9 @@ const CommentVotes: FC<CommentVotesProps> = ({
         description: dict.toast.voteNotRegistered,
         variant: 'destructive',
       })
+    },
+    onSuccess: (_, voteType) => {
+      trackEvent(AnalyticsEvent.VOTE_CAST, { targetType: 'comment', commentId, voteType })
     },
     onMutate: (type: VoteType) => {
       if (currentVote?.type === type) {

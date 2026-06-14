@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Icons } from './Icons'
 import { useDict } from '@/components/I18nProvider'
+import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
 
 interface UserAuthFormProps extends React.HTMLAttributes<HTMLDivElement> {
   showCredentials?: boolean
@@ -28,6 +29,7 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
 
   const loginWithProvider = async (provider: string) => {
     setIsLoading(provider)
+    trackEvent(AnalyticsEvent.SIGN_IN, { provider })
     try {
       await signIn(provider, { callbackUrl: '/' })
     } catch {
@@ -41,6 +43,7 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
     e.preventDefault()
     setError('')
     setIsLoading('credentials')
+    trackEvent(AnalyticsEvent.SIGN_IN, { provider: 'credentials' })
     await signIn('credentials', {
       email,
       password,
