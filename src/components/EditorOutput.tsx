@@ -3,9 +3,29 @@
 import CustomCodeRenderer from '@/components/renderers/CustomCodeRenderer'
 import CustomImageRenderer from '@/components/renderers/CustomImageRenderer'
 import MathRenderer from '@/components/renderers/MathRenderer'
-import { FC } from 'react'
+import { Component, FC } from 'react'
 import dynamic from 'next/dynamic'
 import { useDict } from '@/components/I18nProvider'
+
+// ErrorBoundary to prevent editorjs-react-renderer crashes from breaking the page
+class EditorErrorBoundary extends Component<
+  { children: React.ReactNode; fallback: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: string }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  render() {
+    if (this.state.hasError) {
+      return <p className='text-sm text-zinc-400 italic'>{this.props.fallback}</p>
+    }
+    return this.props.children
+  }
+}
 
 const Output = dynamic(
   async () => (await import('editorjs-react-renderer')).default,
@@ -64,13 +84,15 @@ const EditorOutput: FC<EditorOutputProps> = ({ content }) => {
   const dict = useDict()
   const data = normalizeContent(content, dict.editor.noContent)
   return (
-    // @ts-expect-error
-    <Output
-      style={style}
-      className='text-sm'
-      renderers={renderers}
-      data={data}
-    />
+    <EditorErrorBoundary fallback={dict.editor.noContent}>
+      {/* @ts-expect-error */}
+      <Output
+        style={style}
+        className='text-sm'
+        renderers={renderers}
+        data={data}
+      />
+    </EditorErrorBoundary>
   )
 }
 
