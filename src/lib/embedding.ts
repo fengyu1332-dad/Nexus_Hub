@@ -76,6 +76,41 @@ export function chunkMarkdown(
   return chunks.filter((c) => c.length > 50) // 过滤太短的块
 }
 
+// ── Embedding API 调用 ─────────────────────────────────────
+
+/**
+ * 调用 Embedding API 生成文本向量。
+ * 需要配置 EMBEDDING_API_KEY（OpenAI 兼容接口）。
+ * 失败时抛出异常，调用方应捕获并降级。
+ */
+export async function getEmbedding(text: string): Promise<number[]> {
+  const apiKey = process.env.EMBEDDING_API_KEY
+  if (!apiKey) {
+    throw new Error('Embedding API key not configured')
+  }
+  const apiBase =
+    process.env.EMBEDDING_API_BASE ||
+    'https://api.openai.com/v1/embeddings'
+  const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
+
+  const res = await fetch(apiBase, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ model, input: text.substring(0, 8000) }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Embedding API error: ${res.status} ${err}`)
+  }
+
+  const json = await res.json()
+  return json.data?.[0]?.embedding || []
+}
+
 // ── 检索接口 ─────────────────────────────────────────────
 
 interface EmbeddedChunk {

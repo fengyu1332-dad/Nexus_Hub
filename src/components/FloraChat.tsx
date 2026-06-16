@@ -1,10 +1,40 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Flower2, Send, X, Minimize2, Maximize2, Loader2, Square } from 'lucide-react'
+import { Flower2, Send, X, Minimize2, Maximize2, Loader2, Square, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Dictionary } from '@/i18n/types'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+
+const STORAGE_KEY = 'flora_chat_history'
+const MAX_STORED_MESSAGES = 20
+
+function loadMessages(welcomeMsg: string): Message[] {
+  if (typeof window === 'undefined') return [{ id: 'welcome', role: 'flora' as const, content: welcomeMsg, timestamp: Date.now() }]
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) throw new Error('No history')
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error('Invalid history')
+    // Ensure first message is welcome
+    const cleaned = parsed.map((m: any) => ({ ...m, role: m.role === 'assistant' ? 'flora' : m.role }))
+    if (cleaned[0]?.id === 'welcome') {
+      cleaned[0].content = welcomeMsg // Always use latest welcome message
+      return cleaned as Message[]
+    }
+    throw new Error('Corrupt history')
+  } catch {
+    return [{ id: 'welcome', role: 'flora' as const, content: welcomeMsg, timestamp: Date.now() }]
+  }
+}
+
+function saveMessages(messages: Message[]) {
+  if (typeof window === 'undefined') return
+  try {
+    const subset = messages.slice(-MAX_STORED_MESSAGES)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(subset))
+  } catch { /* quota exceeded — silently ignore */ }
+}
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -96,14 +126,7 @@ function ChatBubble({
 export function FloraChat({ dict }: { dict: Dictionary }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
-  const [messages, setMessages] = useState<Message[]>(() => [
-    {
-      id: 'welcome',
-      role: 'flora',
-      content: dict.flora.welcomeMessage,
-      timestamp: Date.now(),
-    },
-  ])
+  const [messages, setMessages] = useState<Message[]>(() => loadMessages(dict.flora.welcomeMessage))
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
@@ -116,6 +139,27 @@ export function FloraChat({ dict }: { dict: Dictionary }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
+
+  // Persist messages to localStorage (skip welcome-only state)
+  useEffect(() => {
+    if (messages.length > 1) {
+      saveMessages(messages)
+    }
+  }, [messages])
+
+  const clearHistory = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+    setMessages([
+      {
+        id: 'welcome',
+        role: 'flora',
+        content: dict.flora.welcomeMessage,
+        timestamp: Date.now(),
+      },
+    ])
+  }, [dict.flora.welcomeMessage])
 
   // Focus input on open
   useEffect(() => {
@@ -341,6 +385,12 @@ export function FloraChat({ dict }: { dict: Dictionary }) {
         </div>
 
         <div className='flex items-center gap-1'>
+          <button
+            onClick={clearHistory}
+            className='p-1.5 rounded-lg hover:bg-white/20 transition-colors'
+            title={dict.flora.clearHistory}>
+            <Trash2 className='h-3.5 w-3.5' />
+          </button>
           <button
             onClick={() => setIsMinimized(!isMinimized)}
             className='p-1.5 rounded-lg hover:bg-white/20 transition-colors'

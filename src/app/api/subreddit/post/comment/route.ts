@@ -2,6 +2,7 @@ import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { CommentValidator } from '@/lib/validators/comment'
 import { z } from 'zod'
+import { checkContentQuality } from '@/lib/moderation'
 
 export async function PATCH(req: Request) {
   try {
@@ -13,6 +14,24 @@ export async function PATCH(req: Request) {
 
     if (!session?.user) {
       return new Response('Unauthorized', { status: 401 })
+    }
+
+    // Moderation check
+    try {
+      const moderationResult = await checkContentQuality(text, 'comment')
+      if (!moderationResult.passed) {
+        return new Response(
+          JSON.stringify({
+            error: 'moderation_failed',
+            flags: moderationResult.flags,
+            sensitiveWords: moderationResult.sensitiveWords,
+            message: '评论包含敏感词或不符合社区规范，请修改后重试',
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    } catch {
+      // Moderation error — allow through
     }
 
     await db.comment.create({

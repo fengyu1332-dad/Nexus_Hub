@@ -71,6 +71,26 @@ export async function POST(req: Request) {
       )
     }
 
+    // 2d. 语义去重（embedding 余弦相似度）
+    try {
+      const { checkSemanticDedup } = await import('@/lib/dedup')
+      const semDup = await checkSemanticDedup(title, content)
+      if (semDup.isDuplicate && semDup.matchedPost) {
+        return new Response(
+          JSON.stringify({
+            duplicate: true,
+            existingPostId: semDup.matchedPost.id,
+            reason: 'semantic_similarity',
+            score: semDup.score,
+            matchedTitle: semDup.matchedPost.title,
+          }),
+          { status: 409, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    } catch {
+      // Semantic dedup not available — skip
+    }
+
     // ── 3. 查找 AI 用户 ──────────────────────────────────────
     console.log('[ai-publish] Looking for AI user:', authorRole)
     const aiAuthor = await db.user.findFirst({

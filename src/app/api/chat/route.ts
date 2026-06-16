@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { cosineSimilarity, semanticSearch } from '@/lib/embedding'
+import { cosineSimilarity, getEmbedding, semanticSearch } from '@/lib/embedding'
 import {
   FLORA_SYSTEM_PROMPT,
   buildFloraContext,
@@ -25,37 +25,6 @@ const ChatValidator = z.object({
     .max(10)
     .optional(),
 })
-
-// ── Embedding API 调用 ─────────────────────────────────────
-
-async function getEmbedding(text: string): Promise<number[]> {
-  // 必须显式配置 EMBEDDING_API_KEY，不 fallback 到 chat API key
-  const apiKey = process.env.EMBEDDING_API_KEY
-  if (!apiKey) {
-    throw new Error('Embedding API key not configured')
-  }
-  const apiBase =
-    process.env.EMBEDDING_API_BASE ||
-    'https://api.openai.com/v1/embeddings'
-  const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
-
-  const res = await fetch(apiBase, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({ model, input: text }),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Embedding API error: ${res.status} ${err}`)
-  }
-
-  const json = await res.json()
-  return json.data?.[0]?.embedding || []
-}
 
 // ── 关键词检索（无 Embedding 时的降级方案） ──────────────────
 
@@ -241,20 +210,19 @@ export async function POST(req: Request) {
       const fb = fallbackReply(message)
       const stream = new ReadableStream({
         start(controller) {
-          controller.enqueue(`data: ${JSON.stringify({ type: 'sources', data: sources })}\n\n`)
-          // 逐字符模拟流式输出
+          const enc = new TextEncoder()
+          const s = (str: string) => controller.enqueue(enc.encode(str))
+          s(`data: ${JSON.stringify({ type: 'sources', data: sources })}\n\n`)
           let i = 0
           const timer = setInterval(() => {
             while (i < fb.length) {
               const chunk = fb.slice(i, i + 3)
               i += chunk.length
-              controller.enqueue(
-                `data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`
-              )
+              s(`data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`)
               return
             }
             clearInterval(timer)
-            controller.enqueue('data: [DONE]\n\n')
+            s('data: [DONE]\n\n')
             controller.close()
           }, 30)
         },
@@ -270,33 +238,37 @@ export async function POST(req: Request) {
       })
     }
 
-    // 3. 调用 DeepSeek（非流式 — 可靠性优先，已验证端到端工作）
+    // 3. 调用 DeepSeek（尝试流式，失败时自动降级为非流式）
+    const dsPayload = {
+      model,
+      temperature: 0.7,
+      max_tokens: 1024,
+      stream: true,
+      messages: [
+        { role: 'system', content: FLORA_SYSTEM_PROMPT },
+        ...(history || []).map((h: any) => ({
+          role: h.role === 'flora' ? ('assistant' as const) : ('user' as const),
+          content: h.content,
+        })),
+        { role: 'user', content: buildFloraUserMessage(message, context) },
+      ],
+    }
+
     const dsRes = await fetch(apiBase, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.7,
-        max_tokens: 1024,
-        stream: false,
-        messages: [
-          { role: 'system', content: FLORA_SYSTEM_PROMPT },
-          ...(history || []).map((h) => ({
-            role: h.role === 'flora' ? ('assistant' as const) : ('user' as const),
-            content: h.content,
-          })),
-          { role: 'user', content: buildFloraUserMessage(message, context) },
-        ],
-      }),
+      body: JSON.stringify(dsPayload),
     })
 
     if (!dsRes.ok) {
+      let errorText = ''
+      try { const ej = await dsRes.json(); errorText = ej?.error?.message || '' } catch {}
       return new Response(
         JSON.stringify({
-          reply: `抱歉，我的大脑暂时掉线了 😢 (API 返回 ${dsRes.status})。请稍后再试～`,
+          reply: `抱歉，我的大脑暂时掉线了 😢 (API ${dsRes.status}${errorText ? ': ' + errorText : ''})。请稍后再试～`,
           sources,
         }),
         {
@@ -310,30 +282,80 @@ export async function POST(req: Request) {
       )
     }
 
-    const dsJson = await dsRes.json()
-    const fullReply = dsJson.choices?.[0]?.message?.content || ''
+    // Try true streaming via ReadableStream pipe; fallback to buffered streaming
+    const useStreaming = dsRes.body && typeof dsRes.body.getReader === 'function'
 
-    // 4. 构建 SSE 流 — 逐字符分块模拟流式输出
     const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          `data: ${JSON.stringify({ type: 'sources', data: sources })}\n\n`
-        )
+      async start(controller) {
+        const enc = new TextEncoder()
+        const s = (str: string) => controller.enqueue(enc.encode(str))
+        s(`data: ${JSON.stringify({ type: 'sources', data: sources })}\n\n`)
 
-        let i = 0
-        const timer = setInterval(() => {
-          while (i < fullReply.length) {
-            const chunk = fullReply.slice(i, i + 3)
-            i += chunk.length
-            controller.enqueue(
-              `data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`
-            )
-            return
+        if (!useStreaming) {
+          // Fallback: read entire response and stream in chunks
+          try {
+            const json = await dsRes.json()
+            const fullReply = json.choices?.[0]?.message?.content || ''
+            let i = 0
+            const flush = () => {
+              while (i < fullReply.length) {
+                const chunk = fullReply.slice(i, i + 5)
+                i += chunk.length
+                s(`data: ${JSON.stringify({ type: 'delta', content: chunk })}\n\n`)
+                if (i < fullReply.length) {
+                  setTimeout(flush, 15)
+                } else {
+                  s('data: [DONE]\n\n')
+                  controller.close()
+                }
+                return
+              }
+              s('data: [DONE]\n\n')
+              controller.close()
+            }
+            flush()
+          } catch {
+            s('data: [DONE]\n\n')
+            controller.close()
           }
-          clearInterval(timer)
-          controller.enqueue('data: [DONE]\n\n')
-          controller.close()
-        }, 30)
+          return
+        }
+
+        // True streaming: pipe DeepSeek SSE response
+        const reader = dsRes.body!.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let lastChunkTime = Date.now()
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            lastChunkTime = Date.now()
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              const trimmed = line.trim()
+              if (!trimmed || !trimmed.startsWith('data:')) continue
+              const data = trimmed.slice(5).trim()
+              if (data === '[DONE]') continue
+
+              try {
+                const parsed = JSON.parse(data)
+                const delta = parsed.choices?.[0]?.delta?.content
+                if (delta) {
+                  s(`data: ${JSON.stringify({ type: 'delta', content: delta })}\n\n`)
+                }
+              } catch { /* skip */ }
+            }
+          }
+        } catch { /* stream error */ }
+
+        s('data: [DONE]\n\n')
+        controller.close()
       },
     })
 

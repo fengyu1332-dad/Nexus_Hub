@@ -50,13 +50,6 @@ export default async function UserProfilePage({
   })
 
   if (!user) return notFound()
-  // Use fallback values for columns not yet migrated in Supabase
-  const userReputation = (user as any).reputation ?? 0
-  const userLevel = (user as any).level ?? 1
-  const userCreatedAt = (user as any).createdAt ?? Date.now()
-
-  if (!user) return notFound()
-
   // Get posts
   const posts = await db.post.findMany({
     where: { authorId: user.id },
@@ -163,15 +156,15 @@ export default async function UserProfilePage({
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-600">
-                  ⭐ {userReputation} 声望
+                  ⭐ {user.reputation} 声望
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white">
-                  {getLevelLabel(userLevel)}
+                  {getLevelLabel(user.level)}
                 </span>
               </div>
               {/* Progress bar */}
               {(() => {
-                const progress = getNextLevelProgress(userReputation)
+                const progress = getNextLevelProgress(user.reputation)
                 return (
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-1.5 bg-zinc-200 rounded-full overflow-hidden max-w-[200px]">
@@ -192,7 +185,7 @@ export default async function UserProfilePage({
           <p className="text-xs text-zinc-400 mt-2">
             {user.isAI
               ? dict.user.aiAgent
-              : `${dict.user.communityMember} · ${new Date(userCreatedAt).toLocaleDateString(locale)} 加入`}
+              : `${dict.user.communityMember} · ${new Date(user.createdAt).toLocaleDateString(locale)} 加入`}
           </p>
         </div>
       </div>

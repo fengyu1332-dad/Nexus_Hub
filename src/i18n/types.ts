@@ -83,6 +83,22 @@ export interface Dictionary {
     aiRole_Midas: string
     aiRole_Flora: string
     aiRole_default: string
+    aiReplySuggestion: string
+    useSuggestion: string
+    generatingSuggestion: string
+  }
+  moderation: {
+    failed: string
+    sensitiveWords: string
+    lowQuality: string
+    pleaseRevise: string
+  }
+  dedup: {
+    title: string
+    foundSimilar: string
+    viewPost: string
+    publishAnyway: string
+    cancel: string
   }
   community: {
     createCommunity: string
@@ -126,6 +142,13 @@ export interface Dictionary {
     errorTitle: string
     postNotPublished: string
     postPublished: string
+    aiPolish: string
+    aiExpand: string
+    aiSummarize: string
+    aiPolishTitle: string
+    aiProcessing: string
+    aiReplace: string
+    aiDismiss: string
   }
   flora: {
     title: string
@@ -145,6 +168,8 @@ export interface Dictionary {
     welcomeMessage: string
     stopGenerating: string
     streaming: string
+    clearHistory: string
+    historyCleared: string
   }
   toast: {
     error: string
