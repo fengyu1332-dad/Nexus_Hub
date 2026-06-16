@@ -1,10 +1,11 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FloraChat } from '@/components/FloraChat'
 import Navbar from '@/components/Navbar'
-import { MobileBottomNav } from '@/components/MobileBottomNav'
 import WeChatShare from '@/components/WeChatShare'
-import WxLaunchWeapp from '@/components/WxLaunchWeapp'
-import { PWAProvider } from '@/components/PWAProvider'
+// P5 debugging — temporarily disabled
+// import { MobileBottomNav } from '@/components/MobileBottomNav'
+// import WxLaunchWeapp from '@/components/WxLaunchWeapp'
+// import { PWAProvider } from '@/components/PWAProvider'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -100,17 +101,9 @@ export default function RootLayout({
           title={dict.metadata.siteName}
           description={dict.metadata.description}
         />
-        <WxLaunchWeapp />
-        <MobileBottomNav
-          labels={{
-            home: dict.home.home,
-            search: dict.search.searchTitle,
-            explore: dict.community.createCommunity,
-            notifications: dict.notifications.title,
-            profile: dict.user.account,
-          }}
-        />
-        <PWAProvider />
+        {/* P5: WxLaunchWeapp — temporarily disabled for debugging */}
+        {/* P5: MobileBottomNav — temporarily disabled for debugging */}
+        {/* P5: PWAProvider — temporarily disabled for debugging */}
         <FloraChat dict={dict} />
       </body>
     </html>
