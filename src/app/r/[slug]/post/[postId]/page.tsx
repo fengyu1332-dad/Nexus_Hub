@@ -1,6 +1,7 @@
-// ── Step 2a: Static metadata (no DB, no cookies, no imports) ──
+// ── Step 2b: Add getDictionary() back ──
 
 import { db } from '@/lib/db'
+import { getDictionary } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -10,9 +11,10 @@ interface SubRedditPostPageProps {
 }
 
 export async function generateMetadata({ params }: SubRedditPostPageProps): Promise<Metadata> {
+  const dict = getDictionary()
   return {
-    title: `Post ${params.postId} | Nexus Hub`,
-    description: 'Static metadata — no DB, no cookies, no imports beyond next',
+    title: `Post ${params.postId} | ${dict.metadata.titleSuffix}`,
+    description: 'Step 2b: getDictionary() added',
   }
 }
 
