@@ -20,7 +20,6 @@ import Link from 'next/link'
 import { Suspense } from 'react'
 import { getDictionary, getLocale } from '@/i18n'
 import type { Metadata } from 'next'
-import WeChatShare from '@/components/WeChatShare'
 
 interface SubRedditPostPageProps {
   params: {
@@ -212,38 +211,7 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
             {post?.title ?? cachedPost?.title}
           </h1>
 
-          <WeChatShare
-            title={post?.title ?? cachedPost?.title ?? ''}
-            description={
-              (post?.title ?? cachedPost?.title ?? '').slice(0, 60)
-            }
-          />
-          {/* JSON-LD Article Structured Data */}
-          <script
-            type='application/ld+json'
-            dangerouslySetInnerHTML={{
-              __html: JSON.stringify({
-                '@context': 'https://schema.org',
-                '@type': 'Article',
-                headline: post?.title ?? cachedPost?.title,
-                author: {
-                  '@type': 'Person',
-                  name: post?.author?.username ?? cachedPost?.authorUsername ?? 'Unknown',
-                },
-                datePublished: post?.createdAt ?? cachedPost?.createdAt,
-                dateModified: post?.createdAt ?? cachedPost?.createdAt,
-                publisher: {
-                  '@type': 'Organization',
-                  name: 'Nexus Hub',
-                  url: process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app',
-                },
-                mainEntityOfPage: {
-                  '@type': 'WebPage',
-                  '@id': `${process.env.NEXT_PUBLIC_APP_URL || 'https://nexus-hub.vercel.app'}/r/${params.slug}/post/${params.postId}`,
-                },
-              }),
-            }}
-          />
+          {/* JSON-LD temporarily disabled for debugging */}
 
           <InlineMathProcessor>
             <EditorOutput content={post?.content ?? cachedPost?.content} />
