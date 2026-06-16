@@ -20,6 +20,8 @@ export function UserAvatar({ user, ...props }: UserAvatarProps) {
             src={user.image}
             alt='profile picture'
             referrerPolicy='no-referrer'
+            sizes='48px'
+            loading='lazy'
           />
         </div>
       ) : (

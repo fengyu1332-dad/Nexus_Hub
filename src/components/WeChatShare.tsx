@@ -80,7 +80,7 @@ export default function WeChatShare({ title, description, imageUrl }: WeChatShar
             title,
             desc: description,
             link: url,
-            imgUrl: imageUrl || `${window.location.origin}/android-chrome-512x512.png`,
+            imgUrl: imageUrl || `${window.location.origin}/og.png`,
           }
           wx.updateAppMessageShareData(shareData)
           wx.updateTimelineShareData(shareData)

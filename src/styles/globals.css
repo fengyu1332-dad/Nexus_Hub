@@ -73,9 +73,39 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+
+  /* Touch feedback for interactive elements */
+  a:active,
+  button:active {
+    opacity: 0.85;
+  }
+
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  @media screen and (max-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Pull-to-refresh visual indicator */
+  .ptr-indicator {
+    transition: transform 0.2s ease;
+  }
+  .ptr-indicator.pulling {
+    transform: rotate(180deg);
   }
 }

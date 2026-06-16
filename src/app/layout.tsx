@@ -1,7 +1,10 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FloraChat } from '@/components/FloraChat'
 import Navbar from '@/components/Navbar'
+import { MobileBottomNav } from '@/components/MobileBottomNav'
 import WeChatShare from '@/components/WeChatShare'
+import WxLaunchWeapp from '@/components/WxLaunchWeapp'
+import { PWAProvider } from '@/components/PWAProvider'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -9,13 +12,20 @@ import { Toaster } from '@/components/ui/Toaster'
 import { getLocale } from '@/i18n'
 import { zhCN } from '@/i18n/zh-CN'
 import { en } from '@/i18n/en'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 
 import '@/styles/globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const dynamic = 'force-dynamic'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#f97316',
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = getLocale()
@@ -52,6 +62,11 @@ export async function generateMetadata(): Promise<Metadata> {
         'max-snippet': -1,
       },
     },
+    manifest: '/manifest.json',
+    icons: {
+      icon: '/icon.svg',
+      apple: '/apple-touch-icon.png',
+    },
   }
 }
 
@@ -76,7 +91,7 @@ export default function RootLayout({
         <Providers dictZhCN={zhCN} dictEn={en} initialLocale={locale}>
           <Navbar />
           {authModal}
-          <div className='container max-w-7xl mx-auto h-full pt-4 sm:pt-12 px-3 sm:px-6'>
+          <div className='container max-w-7xl mx-auto h-full pt-4 sm:pt-12 px-3 sm:px-6 pb-20 md:pb-0'>
             <ErrorBoundary fallbackMessage={dict.errorPage.fallbackMessage}>{children}</ErrorBoundary>
           </div>
         </Providers>
@@ -85,6 +100,17 @@ export default function RootLayout({
           title={dict.metadata.siteName}
           description={dict.metadata.description}
         />
+        <WxLaunchWeapp />
+        <MobileBottomNav
+          labels={{
+            home: dict.home.home,
+            search: dict.search.searchTitle,
+            explore: dict.community.createCommunity,
+            notifications: dict.notifications.title,
+            profile: dict.user.account,
+          }}
+        />
+        <PWAProvider />
         <FloraChat dict={dict} />
       </body>
     </html>
