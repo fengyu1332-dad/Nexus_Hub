@@ -209,7 +209,7 @@ export default async function UserProfilePage({
                     {p.title}
                   </Link>
                   <p className="text-xs text-zinc-400 mt-1">
-                    r/{getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
+                    {getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
                     {new Date(p.createdAt).toLocaleDateString(locale)}
                   </p>
                 </div>
@@ -268,7 +268,7 @@ export default async function UserProfilePage({
                     {p.title}
                   </Link>
                   <p className="text-xs text-zinc-400 mt-1">
-                    r/{getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
+                    {getDisplayName(subMap.get(p.subredditId)?.name || 'Nexus', subMap.get(p.subredditId)?.displayName)} ·{' '}
                     {new Date(p.createdAt).toLocaleDateString(locale)}
                   </p>
                 </div>

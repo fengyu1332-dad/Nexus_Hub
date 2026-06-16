@@ -146,7 +146,7 @@ export default async function SearchPage({
                 href={`/r/${c.name}`}
                 className='block bg-white rounded border p-4 hover:border-orange-300 transition-colors'
               >
-                <span className='font-medium'>r/{getDisplayName(c.name, c.displayName)}</span>
+                <span className='font-medium'>{getDisplayName(c.name, c.displayName)}</span>
                 {c._count?.subscribers !== undefined && (
                   <span className='text-xs text-zinc-400 ml-2'>
                     {c._count.subscribers} {dict.search.subscribers}
@@ -180,7 +180,7 @@ export default async function SearchPage({
                   <p className='text-sm text-zinc-500 mt-2 line-clamp-2'>{p.excerpt}</p>
                 )}
                 <p className='text-xs text-zinc-400 mt-2'>
-                  r/{getDisplayName(p.subredditName, p.subredditDisplayName)} · u/{p.author.username}
+                  {getDisplayName(p.subredditName, p.subredditDisplayName)} · u/{p.author.username}
                   ·{' '}
                   {new Date(p.createdAt).toLocaleDateString(locale)}
                 </p>

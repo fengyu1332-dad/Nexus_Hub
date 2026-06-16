@@ -173,7 +173,7 @@ export function NewsletterManager() {
                       <p className='text-xs text-zinc-500 mt-1 line-clamp-2'>{post.excerpt}</p>
                     )}
                     <p className='text-xs text-zinc-400 mt-1'>
-                      r/{getDisplayName(post.subredditName || '—', post.subredditDisplayName)} ·{' '}
+                      {getDisplayName(post.subredditName || '—', post.subredditDisplayName)} ·{' '}
                       u/{post.author?.username || 'Unknown'} ·{' '}
                       {new Date(post.createdAt).toLocaleDateString('zh-CN')}
                     </p>

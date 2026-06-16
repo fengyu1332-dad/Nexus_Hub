@@ -61,7 +61,7 @@ export default async function BoardSidebar() {
                   href={`/r/${b.name}`}
                   className='block rounded px-2 py-1.5 -mx-1 text-zinc-700 hover:bg-zinc-100 hover:text-orange-600 transition-colors'
                   title={b.description || ''}>
-                  r/{getDisplayName(b.name, b.displayName)}
+                  {getDisplayName(b.name, b.displayName)}
                 </Link>
               ))}
             </div>

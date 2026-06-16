@@ -185,7 +185,7 @@ export function AdminPostsTable({
                     </span>
                   </td>
                   <td className='px-4 py-2.5 text-zinc-500 hidden md:table-cell'>
-                    r/{getDisplayName(post.subreddit?.name || '—', post.subreddit?.displayName)}
+                    {getDisplayName(post.subreddit?.name || '—', post.subreddit?.displayName)}
                   </td>
                   <td className='px-4 py-2.5 text-right'>
                     <button

@@ -156,7 +156,7 @@ export function DedupScanner() {
                       </div>
                     </div>
                     <div className='flex items-center gap-1.5 mt-2 text-xs text-zinc-400'>
-                      <span>r/{getDisplayName(post.subreddit?.name || '—', post.subreddit?.displayName)}</span>
+                      <span>{getDisplayName(post.subreddit?.name || '—', post.subreddit?.displayName)}</span>
                       <span>·</span>
                       <span>u/{post.author?.username || 'Unknown'}</span>
                       <span>·</span>

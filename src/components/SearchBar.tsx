@@ -109,7 +109,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
                   key={sub.id}
                   value={sub.name}>
                   <Users className='mr-2 h-4 w-4' />
-                  <span>r/{getDisplayName(sub.name, sub.displayName)}</span>
+                  <span>{getDisplayName(sub.name, sub.displayName)}</span>
                 </CommandItem>
               ))}
             </CommandGroup>
@@ -129,7 +129,7 @@ const SearchBar: FC<SearchBarProps> = ({}) => {
                   <div className='flex flex-col'>
                     <span className='text-sm truncate'>{post.title}</span>
                     <span className='text-xs text-zinc-400'>
-                      r/{getDisplayName(post.subredditName, post.subredditDisplayName)} · u/{post.author.username}
+                      {getDisplayName(post.subredditName, post.subredditDisplayName)} · u/{post.author.username}
                     </span>
                   </div>
                 </CommandItem>

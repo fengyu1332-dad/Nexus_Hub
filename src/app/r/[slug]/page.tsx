@@ -30,8 +30,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   if (!subreddit) return { title: dict.metadata.communityNotFound }
 
   return {
-    title: `r/${getDisplayName(subreddit.name, (subreddit as any).displayName)} — ${dict.metadata.titleSuffix}`,
-    description: `r/${getDisplayName(subreddit.name, (subreddit as any).displayName)}`,
+    title: `${getDisplayName(subreddit.name, (subreddit as any).displayName)} — ${dict.metadata.titleSuffix}`,
+    description: `${getDisplayName(subreddit.name, (subreddit as any).displayName)}`,
   }
 }
 
@@ -90,7 +90,7 @@ const page = async ({ params, searchParams }: PageProps) => {
   return (
     <>
       <h1 className='font-bold text-3xl md:text-4xl h-14'>
-        r/{getDisplayName(subreddit.name, (subreddit as any).displayName)}
+        {getDisplayName(subreddit.name, (subreddit as any).displayName)}
       </h1>
       <div className='mb-4'>
         <SortSelector />

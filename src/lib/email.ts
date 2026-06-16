@@ -91,7 +91,7 @@ function newsletterTemplate(
         </a>
       </h3>
       <p style="color: #4b5563; font-size: 14px; margin: 0 0 8px 0;">${escapeHtml(p.summary)}</p>
-      <span style="color: #9ca3af; font-size: 12px;">r/${escapeHtml(p.subreddit)} · ${escapeHtml(p.author)}</span>
+      <span style="color: #9ca3af; font-size: 12px;">${escapeHtml(p.subreddit)} · ${escapeHtml(p.author)}</span>
     </div>`
     )
     .join('')

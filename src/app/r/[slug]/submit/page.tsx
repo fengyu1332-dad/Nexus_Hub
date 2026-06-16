@@ -29,7 +29,7 @@ const page = async ({ params }: pageProps) => {
             {dict.community.createPost}
           </h3>
           <p className='ml-2 mt-1 truncate text-sm text-gray-500'>
-            {dict.community.inCommunity} r/{params.slug}
+            {dict.community.inCommunity} {params.slug}
           </p>
         </div>
       </div>

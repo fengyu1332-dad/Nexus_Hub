@@ -93,7 +93,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
   const ogImage = `${baseUrl}/og.png` // Use a site-wide OG image fallback
 
   return {
-    title: `${(post as any).title} — r/${subName} | ${dict.metadata.titleSuffix}`,
+    title: `${(post as any).title} — ${subName} | ${dict.metadata.titleSuffix}`,
     description: `${authorLabel} · ${description}`,
     alternates: {
       canonical: postUrl,

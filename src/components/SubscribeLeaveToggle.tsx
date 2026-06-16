@@ -59,7 +59,7 @@ const SubscribeLeaveToggle = ({
       trackEvent(AnalyticsEvent.COMMUNITY_SUBSCRIBED, { subredditName, subredditId })
       toast({
         title: dict.toast.subscribed,
-        description: `${dict.toast.subscribedTo} r/${displayName}`,
+        description: `${dict.toast.subscribedTo} ${displayName}`,
       })
     },
   })
@@ -87,7 +87,7 @@ const SubscribeLeaveToggle = ({
       trackEvent(AnalyticsEvent.COMMUNITY_UNSUBSCRIBED, { subredditName, subredditId })
       toast({
         title: dict.toast.unsubscribed,
-        description: `${dict.toast.unsubscribedFrom} r/${displayName}`,
+        description: `${dict.toast.unsubscribedFrom} ${displayName}`,
       })
     },
   })
