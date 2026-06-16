@@ -21,7 +21,6 @@ export function UserAvatar({ user, ...props }: UserAvatarProps) {
             alt='profile picture'
             referrerPolicy='no-referrer'
             sizes='48px'
-            loading='lazy'
           />
         </div>
       ) : (

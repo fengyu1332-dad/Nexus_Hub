@@ -13,7 +13,6 @@ function CustomImageRenderer({ data }: any) {
         fill
         src={src}
         sizes='(max-width: 768px) 100vw, 700px'
-        loading='lazy'
       />
     </div>
   )
