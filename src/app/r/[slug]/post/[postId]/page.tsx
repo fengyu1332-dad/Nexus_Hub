@@ -1,24 +1,7 @@
-import CommentsSection from '@/components/CommentsSection'
-import EditorOutput from '@/components/EditorOutput'
-import PostVoteServer from '@/components/post-vote/PostVoteServer'
-
-import { InlineMathProcessor } from '@/components/InlineMathProcessor'
-import { RelatedPosts } from '@/components/RelatedPosts'
-import BookmarkButton from '@/components/BookmarkButton'
-import { buttonVariants } from '@/components/ui/Button'
-import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { redis } from '@/lib/redis'
-import { formatTimeToNow } from '@/lib/utils'
-import { CachedPost } from '@/types/redis'
-import { Post, User, Vote } from '@prisma/client'
-import { ArrowBigDown, ArrowBigUp, Loader2 } from 'lucide-react'
 import { notFound } from 'next/navigation'
 import { getDisplayName } from '@/lib/subreddit'
-import { AIBadge } from '@/components/AIBadge'
-import Link from 'next/link'
-import { Suspense } from 'react'
-import { getDictionary, getLocale } from '@/i18n'
+import { getDictionary } from '@/i18n'
 import type { Metadata } from 'next'
 
 interface SubRedditPostPageProps {
@@ -30,8 +13,6 @@ interface SubRedditPostPageProps {
 
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
-
-// ── Dynamic SEO Metadata ─────────────────────────────────────
 
 export async function generateMetadata({ params }: SubRedditPostPageProps): Promise<Metadata> {
   const dict = getDictionary()
@@ -49,9 +30,7 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
 
   if (!post) return { title: dict.metadata.postNotFound }
 
-  // Resolve author and subreddit
   let authorLabel = 'Unknown'
-  let authorUsername = 'unknown'
   let subName = 'Nexus'
   try {
     const author = await db.user.findFirst({
@@ -59,10 +38,9 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
       select: { username: true, isAI: true, aiRole: true },
     })
     if (author) {
-      authorUsername = (author as any).username || 'unknown'
       authorLabel = (author as any).isAI
         ? `AI-${(author as any).aiRole || ''}`
-        : `u/${authorUsername}`
+        : `u/${(author as any).username || 'unknown'}`
     }
     const sub = await db.subreddit.findFirst({
       where: { id: (post as any).subredditId },
@@ -71,7 +49,6 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
     if (sub) subName = getDisplayName((sub as any).name, (sub as any).displayName)
   } catch { /* fallback */ }
 
-  // Extract plain text description
   let description = ''
   try {
     const content = (post as any).content
@@ -80,23 +57,17 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
       const firstParagraph = parsed?.blocks?.find(
         (b: any) => b.data?.text && b.data.text.length > 30
       )
-      description =
-        firstParagraph?.data?.text?.replace(/<[^>]+>/g, '').substring(0, 160) ||
-        ''
+      description = firstParagraph?.data?.text?.replace(/<[^>]+>/g, '').substring(0, 160) || ''
     }
-  } catch {
-    description = (post as any).title
-  }
+  } catch { description = (post as any).title }
 
   const postUrl = `${baseUrl}/r/${params.slug}/post/${params.postId}`
-  const ogImage = `${baseUrl}/og.png` // Use a site-wide OG image fallback
+  const ogImage = `${baseUrl}/og.png`
 
   return {
     title: `${(post as any).title} — ${subName} | ${dict.metadata.titleSuffix}`,
     description: `${authorLabel} · ${description}`,
-    alternates: {
-      canonical: postUrl,
-    },
+    alternates: { canonical: postUrl },
     openGraph: {
       title: (post as any).title,
       description: `${authorLabel} · ${description}`,
@@ -117,192 +88,29 @@ export async function generateMetadata({ params }: SubRedditPostPageProps): Prom
   }
 }
 
+// ── MINIMAL page for debugging client crash ──────────────
+
 const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
   const dict = getDictionary()
-  const locale = getLocale()
-  // Redis 未配置时跳过缓存，直接用 DB 查询
-  let cachedPost: CachedPost | null = null
+  let post: any = null
+
   try {
-    cachedPost = (await redis.hgetall(
-      `post:${params.postId}`
-    )) as CachedPost
-  } catch {
-    cachedPost = null
-  }
+    post = await db.post.findFirst({
+      where: { id: params.postId },
+      include: { votes: true, author: true },
+    })
+  } catch { /* db error */ }
 
-  let post: (Post & { votes: Vote[]; author: User }) | null = null
-
-  if (!cachedPost) {
-    try {
-      post = await db.post.findFirst({
-        where: {
-          id: params.postId,
-        },
-        include: {
-          votes: true,
-          author: true,
-        },
-      })
-    } catch {
-      // findFirst may fail
-    }
-  }
-
-  if (!post && !cachedPost) return notFound()
-
-  // Check if current user has bookmarked this post
-  let session = null
-  try {
-    session = await getAuthSession()
-  } catch {
-    // getAuthSession may fail during SSR on Vercel
-  }
-  let isSaved = false
-  if (session?.user) {
-    try {
-      const bookmark = await db.bookmark.findFirst({
-        where: {
-          userId: session.user.id,
-          postId: params.postId,
-        },
-      })
-      isSaved = !!bookmark
-    } catch {
-      // Bookmark table may not exist yet
-    }
-  }
+  if (!post) return notFound()
 
   return (
     <div>
-      <div className='h-full flex flex-col sm:flex-row items-center sm:items-start justify-between'>
-        <Suspense fallback={<PostVoteShell />}>
-          {/* @ts-expect-error server component */}
-          <PostVoteServer
-            postId={post?.id ?? cachedPost?.id ?? params.postId}
-            getData={async () => {
-              return await db.post.findUnique({
-                where: {
-                  id: params.postId,
-                },
-                include: {
-                  votes: true,
-                },
-              })
-            }}
-          />
-        </Suspense>
-
-        <div className='sm:w-0 w-full flex-1 bg-white p-4 rounded-sm'>
-          <div className='flex items-start justify-between'>
-            <p className='max-h-40 mt-1 truncate text-xs text-gray-500'>
-              {dict.user.postedBy}{' '}
-              <Link
-                href={`/u/${post?.author.username ?? cachedPost?.authorUsername}`}
-                className='underline hover:text-orange-500'>
-                u/{post?.author.username ?? cachedPost?.authorUsername}
-              </Link>
-              {(post?.author as any)?.isAI && <AIBadge aiRole={(post?.author as any)?.aiRole} />}
-              {' '}
-              {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
-            </p>
-            <BookmarkButton postId={params.postId} initialSaved={isSaved} />
-          </div>
-          <h1 className='text-xl font-semibold py-2 leading-6 text-gray-900'>
-            {post?.title ?? cachedPost?.title}
-          </h1>
-
-          {/* JSON-LD temporarily disabled for debugging */}
-
-          <InlineMathProcessor>
-            <EditorOutput content={post?.content ?? cachedPost?.content} />
-          </InlineMathProcessor>
-          <Suspense
-            fallback={
-              <Loader2 className='h-5 w-5 animate-spin text-zinc-500' />
-            }>
-            {/* @ts-expect-error Server Component */}
-            <CommentsSection postId={post?.id ?? cachedPost?.id} />
-          </Suspense>
-
-          <Suspense fallback={<Loader2 className='h-5 w-5 animate-spin text-zinc-500 mt-8' />}>
-            <RelatedPostsWrapper
-              currentPostId={post?.id ?? cachedPost?.id ?? params.postId}
-              subredditName={params.slug}
-            />
-          </Suspense>
-        </div>
-      </div>
+      <h1 className='text-xl font-semibold py-2 leading-6 text-gray-900'>
+        {post.title}
+      </h1>
+      <p>DEBUG: Minimal post page — testing for crash.</p>
     </div>
   )
-}
-
-function PostVoteShell() {
-  return (
-    <div className='flex items-center flex-col pr-6 w-20'>
-      {/* upvote */}
-      <div className={buttonVariants({ variant: 'ghost' })}>
-        <ArrowBigUp className='h-5 w-5 text-zinc-700' />
-      </div>
-
-      {/* score */}
-      <div className='text-center py-2 font-medium text-sm text-zinc-900'>
-        <Loader2 className='h-3 w-3 animate-spin' />
-      </div>
-
-      {/* downvote */}
-      <div className={buttonVariants({ variant: 'ghost' })}>
-        <ArrowBigDown className='h-5 w-5 text-zinc-700' />
-      </div>
-    </div>
-  )
-}
-
-async function RelatedPostsWrapper({
-  currentPostId,
-  subredditName,
-}: {
-  currentPostId: string
-  subredditName: string
-}) {
-  try {
-    // Get subreddit ID
-    const sub = await db.subreddit.findFirst({
-      where: { name: subredditName },
-      select: { id: true },
-    })
-    if (!sub) return null
-    const subredditId = (sub as any).id
-
-    // Get current post embedding
-    let embedding: number[] | null = null
-    try {
-      const currentPost = await db.post.findFirst({
-        where: { id: currentPostId },
-        select: { embedding: true },
-      })
-      if (currentPost) {
-        const emb = (currentPost as any).embedding
-        if (typeof emb === 'string') {
-          embedding = JSON.parse(emb)
-        } else if (Array.isArray(emb)) {
-          embedding = emb
-        }
-      }
-    } catch {
-      // embedding lookup failed
-    }
-
-    return (
-      <RelatedPosts
-        currentPostId={currentPostId}
-        subredditId={subredditId}
-        subredditName={subredditName}
-        embedding={embedding}
-      />
-    )
-  } catch {
-    return null
-  }
 }
 
 export default SubRedditPostPage
