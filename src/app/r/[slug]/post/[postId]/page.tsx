@@ -1,7 +1,6 @@
-// ── Step 2b: Add getDictionary() back ──
+// ── Step 2c: DB query in generateMetadata (no getDictionary) ──
 
 import { db } from '@/lib/db'
-import { getDictionary } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-dynamic'
@@ -11,10 +10,17 @@ interface SubRedditPostPageProps {
 }
 
 export async function generateMetadata({ params }: SubRedditPostPageProps): Promise<Metadata> {
-  const dict = getDictionary()
+  let title = `Post ${params.postId} | Nexus Hub`
+  try {
+    const post = await db.post.findFirst({
+      where: { id: params.postId },
+      select: { title: true },
+    })
+    if (post) title = `${(post as any).title} | Nexus Hub`
+  } catch { /* DB error */ }
   return {
-    title: `Post ${params.postId} | ${dict.metadata.titleSuffix}`,
-    description: 'Step 2b: getDictionary() added',
+    title,
+    description: 'Step 2c: DB query in generateMetadata',
   }
 }
 
