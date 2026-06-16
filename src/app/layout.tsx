@@ -13,20 +13,13 @@ import { Toaster } from '@/components/ui/Toaster'
 import { getLocale } from '@/i18n'
 import { zhCN } from '@/i18n/zh-CN'
 import { en } from '@/i18n/en'
-import type { Metadata, Viewport } from 'next'
+import type { Metadata } from 'next'
 
 import '@/styles/globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const dynamic = 'force-dynamic'
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  viewportFit: 'cover',
-  themeColor: '#f97316',
-}
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = getLocale()
