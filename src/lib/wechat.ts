@@ -6,11 +6,10 @@
  * Vercel serverless cold starts (vs. in-memory cache that resets).
  */
 
-import { db } from '@/lib/db-supabase'
+import { db } from '@/lib/db'
 
 const ACCESS_TOKEN_KEY = 'wechat_access_token'
 const JSAPI_TICKET_KEY = 'wechat_jsapi_ticket'
-const EXPIRE_BUFFER_MS = 300_000 // 5 min buffer before actual expiry
 
 interface TokenEntry {
   token: string
@@ -32,33 +31,47 @@ function randomString(length: number = 16): string {
   return result
 }
 
+// In-memory cache (per-serverless-instance, falls back gracefully)
+const memoryCache = new Map<string, TokenEntry>()
+
 async function readToken(key: string): Promise<TokenEntry | null> {
+  // Try memory cache first
+  const memCached = memoryCache.get(key)
+  if (memCached && Date.now() < memCached.expiresAt) {
+    return memCached
+  }
+
+  // Try DB-persisted cache (non-critical — fail silently)
   try {
     const row = await db.pipelineConfig.findFirst({ where: { key } })
-    if (!row) return null
-    const entry = JSON.parse(row.value) as TokenEntry
-    if (!entry?.token || typeof entry.expiresAt !== 'number') return null
-    return entry
+    if (row) {
+      const entry = JSON.parse(row.value) as TokenEntry
+      if (entry?.token && typeof entry.expiresAt === 'number') {
+        memoryCache.set(key, entry)
+        return entry
+      }
+    }
   } catch {
-    return null
+    // PipelineConfig table may not exist — that's fine
   }
+  return null
 }
 
 async function writeToken(key: string, entry: TokenEntry): Promise<void> {
+  memoryCache.set(key, entry)
   try {
     await db.pipelineConfig.upsert({ key, value: JSON.stringify(entry) })
   } catch {
-    // Non-critical — will refetch on next request
+    // Non-critical — memory cache will serve until cold start
   }
 }
 
 async function getAccessToken(): Promise<string> {
-  const now = Date.now()
-
-  // Try DB-persisted cache first
   const cached = await readToken(ACCESS_TOKEN_KEY)
-  if (cached && now < cached.expiresAt) {
-    return cached.token
+  if (cached) return cached.token
+
+  if (!process.env.WECHAT_APP_ID || !process.env.WECHAT_APP_SECRET) {
+    throw new Error('WeChat credentials not configured')
   }
 
   const res = await fetch(
@@ -71,21 +84,15 @@ async function getAccessToken(): Promise<string> {
 
   const entry: TokenEntry = {
     token: data.access_token,
-    expiresAt: now + (data.expires_in - 300) * 1000,
+    expiresAt: Date.now() + (data.expires_in - 300) * 1000,
   }
-  // Fire-and-forget: don't block on write
   writeToken(ACCESS_TOKEN_KEY, entry)
   return data.access_token
 }
 
 async function getJsapiTicket(): Promise<string> {
-  const now = Date.now()
-
-  // Try DB-persisted cache first
   const cached = await readToken(JSAPI_TICKET_KEY)
-  if (cached && now < cached.expiresAt) {
-    return cached.token
-  }
+  if (cached) return cached.token
 
   const token = await getAccessToken()
   const res = await fetch(
@@ -98,9 +105,8 @@ async function getJsapiTicket(): Promise<string> {
 
   const entry: TokenEntry = {
     token: data.ticket,
-    expiresAt: now + (data.expires_in - 300) * 1000,
+    expiresAt: Date.now() + (data.expires_in - 300) * 1000,
   }
-  // Fire-and-forget: don't block on write
   writeToken(JSAPI_TICKET_KEY, entry)
   return data.ticket
 }
