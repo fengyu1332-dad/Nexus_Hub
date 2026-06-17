@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/Label'
 import { Textarea } from '@/components/ui/Textarea'
 import { useDict } from '@/components/I18nProvider'
 import { trackEvent, AnalyticsEvent } from '@/lib/analytics'
+import { useAIWrite } from '@/lib/writing-assistant'
+import { Sparkles, Loader2 } from 'lucide-react'
 
 interface CreateCommentProps {
   postId: string
@@ -24,6 +26,9 @@ const CreateComment: FC<CreateCommentProps> = ({ postId, replyToId }) => {
   const router = useRouter()
   const { loginToast } = useCustomToasts()
   const dict = useDict()
+
+  const { write: aiWriteAction, isLoading: isAIGenerating } = useAIWrite()
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null)
 
   const { mutate: comment, isLoading } = useMutation({
     mutationFn: async ({ postId, text, replyToId }: CommentRequest) => {
@@ -71,7 +76,33 @@ const CreateComment: FC<CreateCommentProps> = ({ postId, replyToId }) => {
           placeholder={dict.user.whatAreYourThoughts}
         />
 
-        <div className='mt-2 flex justify-end'>
+        <div className='mt-2 flex items-center gap-2'>
+          {input.length >= 10 && (
+            <button
+              type='button'
+              disabled={isAIGenerating}
+              onClick={async () => {
+                try {
+                  const result = await aiWriteAction({
+                    text: input,
+                    action: 'expand',
+                    style: 'casual',
+                  })
+                  setAiSuggestion(result)
+                } catch {
+                  // silently fail
+                }
+              }}
+              className='flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50'>
+              {isAIGenerating ? (
+                <Loader2 className='h-3 w-3 animate-spin' />
+              ) : (
+                <Sparkles className='h-3 w-3' />
+              )}
+              {dict.user.aiReplySuggestion}
+            </button>
+          )}
+          <div className='flex-1' />
           <Button
             isLoading={isLoading}
             disabled={input.length === 0}
@@ -79,6 +110,29 @@ const CreateComment: FC<CreateCommentProps> = ({ postId, replyToId }) => {
             {dict.user.post}
           </Button>
         </div>
+
+        {aiSuggestion && (
+          <div className='mt-2 rounded-lg border border-orange-200 bg-orange-50/50 p-3'>
+            <p className='text-xs text-zinc-600 mb-2 whitespace-pre-wrap'>{aiSuggestion}</p>
+            <div className='flex gap-2'>
+              <button
+                type='button'
+                onClick={() => {
+                  setInput(aiSuggestion)
+                  setAiSuggestion(null)
+                }}
+                className='text-xs font-medium text-orange-600 hover:text-orange-700'>
+                {dict.user.useSuggestion}
+              </button>
+              <button
+                type='button'
+                onClick={() => setAiSuggestion(null)}
+                className='text-xs text-zinc-400 hover:text-zinc-600'>
+                {dict.editor.aiDismiss}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

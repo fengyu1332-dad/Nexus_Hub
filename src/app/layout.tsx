@@ -2,10 +2,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { FloraChat } from '@/components/FloraChat'
 import Navbar from '@/components/Navbar'
 import WeChatShare from '@/components/WeChatShare'
-// P5 debugging — temporarily disabled
-// import { MobileBottomNav } from '@/components/MobileBottomNav'
-// import WxLaunchWeapp from '@/components/WxLaunchWeapp'
-// import { PWAProvider } from '@/components/PWAProvider'
+import { MobileBottomNav } from '@/components/MobileBottomNav'
+import WxLaunchWeapp from '@/components/WxLaunchWeapp'
+import { PWAProvider } from '@/components/PWAProvider'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
 import Providers from '@/components/Providers'
@@ -81,6 +80,10 @@ export default function RootLayout({
         'bg-white text-slate-900 antialiased light',
         inter.className
       )}>
+      <head>
+        <meta name='viewport' content='width=device-width, initial-scale=1, viewport-fit=cover' />
+        <meta name='theme-color' content='#f97316' />
+      </head>
       <body className='min-h-screen pt-12 bg-slate-50 antialiased'>
         <Providers dictZhCN={zhCN} dictEn={en} initialLocale={locale}>
           <Navbar />
@@ -94,9 +97,17 @@ export default function RootLayout({
           title={dict.metadata.siteName}
           description={dict.metadata.description}
         />
-        {/* P5: WxLaunchWeapp — temporarily disabled for debugging */}
-        {/* P5: MobileBottomNav — temporarily disabled for debugging */}
-        {/* P5: PWAProvider — temporarily disabled for debugging */}
+        <WxLaunchWeapp path='/' />
+        <MobileBottomNav
+          labels={{
+            home: dict.home.home,
+            search: dict.search.searchTitle,
+            explore: dict.community.createCommunity,
+            notifications: dict.notifications.title,
+            profile: dict.user.account,
+          }}
+        />
+        <PWAProvider />
         <FloraChat dict={dict} />
       </body>
     </html>
