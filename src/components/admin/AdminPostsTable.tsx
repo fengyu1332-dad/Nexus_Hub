@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Loader2, Trash2, CheckSquare, Square } from 'lucide-react'
+import { Loader2, Trash2, CheckSquare, Square, Pin } from 'lucide-react'
 import axios from 'axios'
 import { getDisplayName } from '@/lib/subreddit'
 import { AIBadge } from '@/components/AIBadge'
@@ -12,6 +12,7 @@ interface Post {
   author: { username: string | null; isAI?: boolean; aiRole?: string | null } | null
   subreddit: { name: string; displayName?: string | null } | null
   createdAt: string
+  isPinned?: boolean
 }
 
 type FilterTab = 'all' | 'ai' | 'human'
@@ -22,9 +23,12 @@ export function AdminPostsTable({
 }: {
   initialPosts: Post[]
   deleteLabel: string
+  pinPostLabel: string
+  unpinPostLabel: string
 }) {
   const [posts, setPosts] = useState<Post[]>(initialPosts)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [pinning, setPinning] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<FilterTab>('all')
   const [batchDeleting, setBatchDeleting] = useState(false)
@@ -70,6 +74,20 @@ export function AdminPostsTable({
       alert('删除失败，请重试')
     } finally {
       setDeleting(null)
+    }
+  }
+
+  const handlePin = async (post: Post) => {
+    setPinning(post.id)
+    try {
+      const { data } = await axios.patch(`/api/admin/posts/${post.id}/pin`)
+      setPosts((prev) =>
+        prev.map((p) => (p.id === post.id ? { ...p, isPinned: data.isPinned } : p))
+      )
+    } catch {
+      alert('操作失败，请重试')
+    } finally {
+      setPinning(null)
     }
   }
 
@@ -152,6 +170,7 @@ export function AdminPostsTable({
                 <th className='text-left px-4 py-3 font-medium text-zinc-600'>标题</th>
                 <th className='text-left px-4 py-3 font-medium text-zinc-600 hidden sm:table-cell'>作者</th>
                 <th className='text-left px-4 py-3 font-medium text-zinc-600 hidden md:table-cell'>社区</th>
+                <th className='text-center px-2 py-3 font-medium text-zinc-600 w-12'>置顶</th>
                 <th className='text-right px-4 py-3 font-medium text-zinc-600 w-20'>操作</th>
               </tr>
             </thead>
@@ -186,6 +205,23 @@ export function AdminPostsTable({
                   </td>
                   <td className='px-4 py-2.5 text-zinc-500 hidden md:table-cell'>
                     {getDisplayName(post.subreddit?.name || '—', post.subreddit?.displayName)}
+                  </td>
+                  <td className='px-2 py-2.5 text-center'>
+                    <button
+                      onClick={() => handlePin(post)}
+                      disabled={pinning === post.id}
+                      title={post.isPinned ? unpinPostLabel : pinPostLabel}
+                      className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors disabled:opacity-50 ${
+                        post.isPinned
+                          ? 'bg-amber-50 text-amber-500 hover:bg-amber-100'
+                          : 'text-zinc-400 hover:text-amber-500 hover:bg-amber-50'
+                      }`}>
+                      {pinning === post.id ? (
+                        <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                      ) : (
+                        <Pin className='h-3.5 w-3.5' />
+                      )}
+                    </button>
                   </td>
                   <td className='px-4 py-2.5 text-right'>
                     <button

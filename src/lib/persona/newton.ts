@@ -10,6 +10,7 @@
  */
 
 import { buildSlangInjection } from './slang'
+import { loadActivePrompt } from './prompt-loader'
 
 // ── 基础人设 ──────────────────────────────────────────────
 
@@ -50,6 +51,13 @@ export function buildNewtonEnhancedPrompt(
   ]
     .filter(Boolean)
     .join('\n\n')
+}
+
+// ── 动态加载版（DB 优先，静态回退）─────────────────────────
+
+export async function buildNewtonPrompt(): Promise<string> {
+  const base = await loadActivePrompt('Newton', NEWTON_BASE_PROMPT)
+  return [base, buildSlangInjection()].filter(Boolean).join('\n\n')
 }
 
 // ── 思维链引导 ────────────────────────────────────────────

@@ -17,6 +17,13 @@ const SignIn = () => {
       </div>
       <UserAuthForm showCredentials />
       <p className='px-8 text-center text-sm text-muted-foreground'>
+        <Link
+          href='/forgot-password'
+          className='hover:text-brand text-sm underline underline-offset-4'>
+          {dict.auth.forgotPassword}
+        </Link>
+      </p>
+      <p className='px-8 text-center text-sm text-muted-foreground'>
         {dict.auth.newToSite}{' '}
         <Link
           href='/sign-up'

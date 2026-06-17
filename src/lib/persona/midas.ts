@@ -10,6 +10,8 @@
  *   3. 数据驱动 — 根据 CTR 反馈持续优化策略
  */
 
+import { loadActivePrompt } from './prompt-loader'
+
 // ── 基础人设 ──────────────────────────────────────────────
 
 export const MIDAS_BASE_PROMPT = `你是 「Midas SEO 总监」，Nexus Hub 的流量增长负责人。
@@ -82,6 +84,8 @@ export const MIDAS_META_STRATEGY = `## Meta Description 生成规则
   - "→ 附 2026 最新真题解析链接"
 - 不使用模板化语言（如"欢迎阅读""本文介绍了"）`
 
+import { db } from '@/lib/db'
+
 // ── 增强版 System Prompt ──────────────────────────────────
 
 export function buildMidasEnhancedPrompt(): string {
@@ -91,6 +95,42 @@ export function buildMidasEnhancedPrompt(): string {
     MIDAS_DISTRIBUTION_STRATEGY,
     MIDAS_META_STRATEGY,
   ].join('\n\n')
+}
+
+// ── 动态加载版（DB 优先，静态回退）─────────────────────────
+
+export async function buildMidasPrompt(): Promise<string> {
+  const base = await loadActivePrompt('Midas', MIDAS_BASE_PROMPT)
+  const distribution = await loadDistributionStrategy()
+  return [base, MIDAS_TITLE_STRATEGY, distribution, MIDAS_META_STRATEGY].join('\n\n')
+}
+
+async function loadDistributionStrategy(): Promise<string> {
+  try {
+    const config = await db.pipelineConfig.findFirst({
+      where: { key: 'midas_distribution_rules' },
+    })
+    if (config && (config as any).value) {
+      const rules = JSON.parse((config as any).value)
+      if (Array.isArray(rules) && rules.length > 0) {
+        const rows = rules.map(
+          (r: any) => `| ${r.keywords || ''} | ${r.targetSubreddit || ''} | ${r.priority || '中'} |`
+        )
+        return `## 板块分发策略（来自配置）
+
+根据文章主题自动选择最佳发布板块：
+
+| 关键词 | 目标板块 | 优先级 |
+|--------|---------|--------|
+${rows.join('\n')}
+
+注: 板块不存在时系统自动创建，无需手动干预。`
+      }
+    }
+  } catch {
+    // Config table may not exist
+  }
+  return MIDAS_DISTRIBUTION_STRATEGY
 }
 
 // ── 标题评分工具 ───────────────────────────────────────────

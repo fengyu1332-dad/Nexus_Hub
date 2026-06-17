@@ -81,10 +81,13 @@ export default async function SearchPage({
         createdAt: true,
         authorId: true,
         subredditId: true,
+        status: true,
       },
     })
 
-    const matched = (allPosts || [])
+    const published = (allPosts || []).filter((p: any) => p.status !== 'DRAFT')
+
+    const matched = published
       .map((p: any) => {
         const title = (p.title || '').toLowerCase()
         const body = extractTextFromContent(p.content || '').toLowerCase()

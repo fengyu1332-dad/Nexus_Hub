@@ -21,9 +21,8 @@ export async function POST(req: Request) {
     // 1. 获取本周 AI 文章（兼容 Prisma 和 Supabase REST）
     const now = new Date()
     const dayOfWeek = now.getDay()
-    const daysSinceLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek
     const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - daysSinceLastSunday)
+    weekStart.setDate(now.getDate() - dayOfWeek)
     weekStart.setHours(0, 0, 0, 0)
 
     const posts = await db.post.findMany({

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { markdownToEditorJS } from '@/lib/markdown'
 import { AIPublishValidator } from '@/lib/validators/ai-post'
+import { createPipelineExecution, markPipelineSuccess, markPipelineFailed } from '@/lib/pipeline-logger'
 import { z } from 'zod'
 
 export async function POST(req: Request) {
@@ -132,7 +133,66 @@ export async function POST(req: Request) {
       },
     })
 
-    console.log('[ai-publish] Success:', (post as any).id)
+    // ── 6. 异步生成 embedding（fire-and-forget with retry + logging）──
+    const postId = (post as any).id
+    const postTitle = title
+    const postContent = content
+    ;(async () => {
+      try {
+        const { generateEmbeddingWithRetry } = await import('@/lib/embedding-job')
+        await generateEmbeddingWithRetry(postId, postTitle, postContent)
+        console.log('[ai-publish] Embedding generated for:', postId)
+      } catch (e) {
+        console.warn('[ai-publish] Embedding generation skipped:', e instanceof Error ? e.message : String(e))
+      }
+    })()
+
+    // ── 6b. 自动标签分类（fire-and-forget）────────────────────────
+    ;(async () => {
+      try {
+        const { autoTagPost } = await import('@/lib/tag-classifier')
+        const tags = await autoTagPost(postId, postTitle, postContent)
+        if (tags.length > 0) {
+          console.log('[ai-publish] Auto-tagged:', postId, tags)
+        }
+      } catch (e) {
+        console.warn('[ai-publish] Auto-tagging skipped:', e instanceof Error ? e.message : String(e))
+      }
+    })()
+
+    // ── 6c. Flora 自动首评（fire-and-forget with logging）───────────────
+    const floraUser = await db.user.findFirst({
+      where: { aiRole: 'Flora', isAI: true },
+    })
+    if (floraUser) {
+      const postSummary = content.substring(0, 2000)
+      ;(async () => {
+        const execId = await createPipelineExecution('flora_auto_reply', title.substring(0, 200), postId)
+        try {
+          const { generateWelcomeComment } = await import('@/lib/flora-auto')
+          const comment = await generateWelcomeComment(
+            title, postSummary, subredditName, authorRole
+          )
+          if (comment) {
+            await db.comment.create({
+              data: {
+                text: comment,
+                authorId: (floraUser as any).id,
+                postId: postId,
+              },
+            })
+            console.log('[ai-publish] Flora auto-commented on:', postId)
+          }
+          await markPipelineSuccess(execId, comment ? 'Comment created' : 'No comment needed')
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.warn('[ai-publish] Flora auto-comment skipped:', msg)
+          await markPipelineFailed(execId, msg)
+        }
+      })()
+    }
+
+    console.log('[ai-publish] Success:', postId)
     return new Response(
       JSON.stringify({
         id: (post as any).id,

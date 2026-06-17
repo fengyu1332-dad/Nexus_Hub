@@ -20,6 +20,7 @@ import { Textarea } from '../ui/Textarea'
 import { toast } from '../../hooks/use-toast'
 import { useSession } from 'next-auth/react'
 import { useI18n } from '@/components/I18nProvider'
+import { ReportButton } from '../ReportButton'
 
 type ExtendedComment = Comment & {
   votes: CommentVote[]
@@ -119,6 +120,7 @@ const PostComment: FC<PostCommentProps> = ({
           <MessageSquare className='h-4 w-4 mr-1.5' />
           {dict.user.reply}
         </Button>
+        <ReportButton targetType='comment' targetId={comment.id} />
       </div>
 
       {isReplying ? (

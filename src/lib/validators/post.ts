@@ -11,6 +11,7 @@ export const PostValidator = z.object({
     }),
   subredditId: z.string(),
   content: z.any(),
+  status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
 })
 
 export type PostCreationRequest = z.infer<typeof PostValidator>

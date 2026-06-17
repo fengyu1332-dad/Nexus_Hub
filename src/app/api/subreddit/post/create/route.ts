@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
 
-    const { title, content, subredditId } = PostValidator.parse(body)
+    const { title, content, subredditId, status: postStatus } = PostValidator.parse(body)
 
     const session = await getAuthSession()
 
@@ -28,38 +28,44 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    // Moderation check
-    try {
-      const textContent = extractTextFromBlocks(content)
-      const moderationResult = await checkContentQuality(
-        `${title} ${textContent}`,
-        'post'
-      )
-      if (!moderationResult.passed) {
-        return new Response(
-          JSON.stringify({
-            error: 'moderation_failed',
-            flags: moderationResult.flags,
-            sensitiveWords: moderationResult.sensitiveWords,
-            message: '内容包含敏感词或不符合社区规范，请修改后重试',
-          }),
-          { status: 422, headers: { 'Content-Type': 'application/json' } }
+    const isDraft = postStatus === 'DRAFT'
+
+    // Moderation check (skip for drafts)
+    if (!isDraft) {
+      try {
+        const textContent = extractTextFromBlocks(content)
+        const moderationResult = await checkContentQuality(
+          `${title} ${textContent}`,
+          'post'
         )
+        if (!moderationResult.passed) {
+          return new Response(
+            JSON.stringify({
+              error: 'moderation_failed',
+              flags: moderationResult.flags,
+              sensitiveWords: moderationResult.sensitiveWords,
+              message: '内容包含敏感词或不符合社区规范，请修改后重试',
+            }),
+            { status: 422, headers: { 'Content-Type': 'application/json' } }
+          )
+        }
+      } catch {
+        // Moderation error — allow post through (don't block legitimate content)
       }
-    } catch {
-      // Moderation error — allow post through (don't block legitimate content)
     }
 
-    // verify user is subscribed to passed subreddit id
-    const subscription = await db.subscription.findFirst({
-      where: {
-        subredditId,
-        userId: session.user.id,
-      },
-    })
+    // verify user is subscribed to passed subreddit id (skip for drafts)
+    if (!isDraft) {
+      const subscription = await db.subscription.findFirst({
+        where: {
+          subredditId,
+          userId: session.user.id,
+        },
+      })
 
-    if (!subscription) {
-      return new Response('Subscribe to post', { status: 403 })
+      if (!subscription) {
+        return new Response('Subscribe to post', { status: 403 })
+      }
     }
 
     const post = (await db.post.create({
@@ -68,27 +74,18 @@ export async function POST(req: Request) {
         content,
         authorId: session.user.id,
         subredditId,
+        status: postStatus || 'PUBLISHED',
       },
     })) as any
 
-    // Async embedding generation (fire-and-forget, don't block response)
+    // Async embedding generation (fire-and-forget with retry, skip for drafts)
     const postId = post?.id
-    if (postId) {
+    if (postId && !isDraft) {
       Promise.resolve().then(async () => {
         try {
-          const { getEmbedding } = await import('@/lib/embedding')
+          const { generateEmbeddingWithRetry } = await import('@/lib/embedding-job')
           const textContent = extractTextFromBlocks(content)
-          const textForEmbedding = (title + ' ' + textContent).substring(0, 8000)
-          const embedding = await Promise.race([
-            getEmbedding(textForEmbedding),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-          ])
-          if (embedding && embedding.length > 0) {
-            await db.post.update({
-              where: { id: postId },
-              data: { embedding },
-            } as any)
-          }
+          await generateEmbeddingWithRetry(postId, title, textContent)
         } catch {
           // Non-fatal: post is created, just missing embedding
         }

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 
 import { UserNameForm } from '@/components/UserNameForm'
 import { NewsletterToggle } from '@/components/NewsletterToggle'
+import { SettingsVerification } from '@/components/SettingsVerification'
 import { authOptions, getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { getDictionary } from '@/i18n'
@@ -33,6 +34,18 @@ export default async function SettingsPage() {
     isSubscribed = (subs && subs.length > 0) ? true : false
   } catch {
     // DB unavailable — just default to false
+  }
+
+  // Check email verification status
+  let emailVerified = false
+  try {
+    const u = (await db.user.findFirst({
+      where: { id: (session.user as any).id },
+      select: { emailVerified: true },
+    })) as { emailVerified: string | null } | null
+    emailVerified = !!(u?.emailVerified)
+  } catch {
+    // DB unavailable — default to false
   }
 
   return (
@@ -69,6 +82,19 @@ export default async function SettingsPage() {
                   <p className='mt-1.5 text-sm text-zinc-500'>u/{session.user.username || dict.user.notSet}</p>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Email Verification */}
+          <div className='rounded-lg border bg-card text-card-foreground shadow-sm'>
+            <div className='p-6 space-y-1'>
+              <h3 className='text-2xl font-semibold leading-none tracking-tight'>{dict.auth.verifyEmail}</h3>
+            </div>
+            <div className='p-6 pt-0'>
+              <SettingsVerification
+                emailVerified={emailVerified}
+                email={session.user.email || null}
+              />
             </div>
           </div>
 

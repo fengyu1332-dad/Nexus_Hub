@@ -25,6 +25,7 @@ export default async function AdminPostsPage() {
         createdAt: true,
         authorId: true,
         subredditId: true,
+        isPinned: true,
       },
     })
 
@@ -108,7 +109,7 @@ export default async function AdminPostsPage() {
         </div>
       )}
 
-      <AdminPostsTable initialPosts={enriched} deleteLabel={dict.admin.delete} />
+      <AdminPostsTable initialPosts={enriched} deleteLabel={dict.admin.delete} pinPostLabel={dict.admin.pinPost} unpinPostLabel={dict.admin.unpinPost} />
 
       {/* Dedup Scanner */}
       <div className='border-t border-zinc-200 pt-6 mt-6'>

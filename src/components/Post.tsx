@@ -3,13 +3,16 @@
 import { getDisplayName } from '@/lib/subreddit'
 import { formatTimeToNow } from '@/lib/utils'
 import { Post, User, Vote } from '@prisma/client'
-import { MessageSquare } from 'lucide-react'
+import { MessageSquare, Pin } from 'lucide-react'
 import Link from 'next/link'
 import { FC, useRef } from 'react'
 import EditorOutput from './EditorOutput'
 import PostVoteClient from './post-vote/PostVoteClient'
 import BookmarkButton from './BookmarkButton'
+import { ReportButton } from './ReportButton'
 import { AIBadge } from './AIBadge'
+import { PostFeedbackButtons } from './PostFeedbackButtons'
+import { PostTags } from './PostTags'
 import { useI18n } from '@/components/I18nProvider'
 
 type PartialVote = Pick<Vote, 'type'>
@@ -40,7 +43,7 @@ const Post: FC<PostProps> = ({
   const { dict, locale } = useI18n()
 
   return (
-    <div className='rounded-md bg-white shadow'>
+    <div className={`rounded-md bg-white shadow ${(post as any).isPinned ? 'ring-1 ring-amber-200' : ''}`}>
       <div className='px-6 py-4 flex justify-between'>
         <PostVoteClient
           postId={post.id}
@@ -82,7 +85,10 @@ const Post: FC<PostProps> = ({
             {formatTimeToNow(new Date(post.createdAt), locale)}
           </div>
           <a href={`/r/${subredditName}/post/${post.id}`}>
-            <h1 className='text-lg font-semibold py-2 leading-6 text-gray-900'>
+            <h1 className='text-lg font-semibold py-2 leading-6 text-gray-900 flex items-center gap-1.5'>
+              {(post as any).isPinned && (
+                <Pin className='h-4 w-4 text-amber-500 shrink-0' />
+              )}
               {post.title}
             </h1>
           </a>
@@ -99,6 +105,10 @@ const Post: FC<PostProps> = ({
         </div>
       </div>
 
+      <div className='px-6'>
+        <PostTags postId={post.id} />
+      </div>
+
       <div className='bg-gray-50 z-20 text-sm px-4 py-4 sm:px-6 flex items-center justify-between'>
         <Link
           href={`/r/${subredditName}/post/${post.id}`}
@@ -109,7 +119,14 @@ const Post: FC<PostProps> = ({
           postId={post.id}
           initialSaved={savedPostIds?.includes(post.id) ?? false}
         />
+        <ReportButton targetType='post' targetId={post.id} />
       </div>
+
+      {post.author.isAI && (
+        <div className='px-6 pb-3'>
+          <PostFeedbackButtons postId={post.id} />
+        </div>
+      )}
     </div>
   )
 }

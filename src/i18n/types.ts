@@ -1,6 +1,12 @@
 export type Locale = 'zh-CN' | 'en'
 
 export interface Dictionary {
+  common: {
+    loading: string
+    noData: string
+    refreshPrompt: string
+    error: string
+  }
   metadata: {
     siteName: string
     titleSuffix: string
@@ -42,6 +48,21 @@ export interface Dictionary {
     emailPlaceholder: string
     passwordPlaceholder: string
     usernamePlaceholder: string
+    forgotPassword: string
+    sendResetLink: string
+    resetPassword: string
+    enterNewPassword: string
+    resetEmailSent: string
+    resetEmailDesc: string
+    invalidOrExpiredToken: string
+    passwordResetSuccess: string
+    verifying: string
+    verifyEmail: string
+    verificationSent: string
+    verificationDesc: string
+    emailVerified: string
+    emailNotVerified: string
+    resendVerification: string
   }
   user: {
     feed: string
@@ -149,6 +170,14 @@ export interface Dictionary {
     aiProcessing: string
     aiReplace: string
     aiDismiss: string
+    saveDraft: string
+    draft: string
+    drafts: string
+    draftSaved: string
+    continueEditing: string
+    deleteDraft: string
+    myDrafts: string
+    noDrafts: string
   }
   flora: {
     title: string
@@ -248,6 +277,21 @@ export interface Dictionary {
     savedPosts: string
     noSavedPosts: string
   }
+  report: {
+    report: string
+    reportPost: string
+    reportComment: string
+    reason: string
+    spam: string
+    harassment: string
+    inappropriate: string
+    misinformation: string
+    other: string
+    description: string
+    submit: string
+    submitted: string
+    alreadyReported: string
+  }
   admin: {
     dashboard: string
     users: string
@@ -257,6 +301,7 @@ export interface Dictionary {
     intelSources: string
     newsletter: string
     systemStatus: string
+    tags: string
     totalUsers: string
     totalPosts: string
     totalComments: string
@@ -313,5 +358,64 @@ export interface Dictionary {
     articles: string
     executions: string
     noExecutions: string
+    reports: string
+    pending: string
+    resolved: string
+    dismissed: string
+    resolve: string
+    dismiss: string
+    noReports: string
+    reportedPost: string
+    reportedComment: string
+    reportedBy: string
+    pinPost: string
+    unpinPost: string
+    pinned: string
+    pipeline: string
+    pipelineType: string
+    pipelineStatus: string
+    deadLetter: string
+    retryCount: string
+    noPipelineExecutions: string
+    embeddingStatus: string
+    embeddingCoverage: string
+    postsWithEmbeddings: string
+    pendingEmbeddingJobs: string
+    failedEmbeddingJobs: string
+    backfillEmbeddings: string
+    noEmbeddingKey: string
+  }
+  aiFeedback: {
+    wasThisHelpful: string
+    helpful: string
+    notHelpful: string
+    thanksForFeedback: string
+    tellUsWhy: string
+    qualityScore: string
+    helpfulRatio: string
+  }
+  promptVersion: {
+    title: string
+    agentRole: string
+    promptName: string
+    version: string
+    active: string
+    setActive: string
+    newVersion: string
+    changeNotes: string
+    history: string
+  }
+  tags: {
+    tags: string
+    tagLabel: string
+    noTags: string
+    filterByTags: string
+    addTag: string
+    removeTag: string
+    mergeTags: string
+    tagName: string
+    tagSlug: string
+    tagCategory: string
+    postCount: string
   }
 }

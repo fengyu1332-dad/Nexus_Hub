@@ -1,0 +1,5 @@
+-- Phase 2: Drafts + Pinned Posts — Post model extension
+ALTER TABLE "Post"
+  ADD COLUMN IF NOT EXISTS "status"   TEXT NOT NULL DEFAULT 'PUBLISHED',
+  ADD COLUMN IF NOT EXISTS "isPinned" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "pinnedAt" TIMESTAMPTZ;

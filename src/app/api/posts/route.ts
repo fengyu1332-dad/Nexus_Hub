@@ -67,7 +67,7 @@ export async function GET(req: Request) {
     const posts = await db.post.findMany({
       take: parseInt(limit),
       skip: (parseInt(page) - 1) * parseInt(limit),
-      orderBy,
+      orderBy: [{ isPinned: 'desc' }, orderBy],
       include: {
         subreddit: true,
         votes: true,

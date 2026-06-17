@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, FileText, Bot, Activity, ArrowLeft, Radio, Globe, Mail } from 'lucide-react'
+import { LayoutDashboard, Users, FileText, Bot, Activity, ArrowLeft, Radio, Globe, Mail, Flag, Workflow, Tag } from 'lucide-react'
 
 interface SidebarLabels {
   dashboard: string
@@ -14,6 +14,9 @@ interface SidebarLabels {
   intelSources: string
   newsletter: string
   systemStatus: string
+  reports: string
+  pipeline: string
+  tags: string
   backToSite: string
 }
 
@@ -28,6 +31,9 @@ export function AdminSidebar({ labels }: { labels: SidebarLabels }) {
     { href: '/admin/users', label: labels.users, icon: Users },
     { href: '/admin/posts', label: labels.posts, icon: FileText },
     { href: '/admin/ai-agents', label: labels.aiAgents, icon: Bot },
+    { href: '/admin/reports', label: labels.reports, icon: Flag },
+    { href: '/admin/pipeline', label: labels.pipeline, icon: Workflow },
+    { href: '/admin/tags', label: labels.tags, icon: Tag },
     { href: '/admin/status', label: labels.systemStatus, icon: Activity },
   ]
 

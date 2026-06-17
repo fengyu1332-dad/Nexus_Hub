@@ -1,6 +1,8 @@
 import { db } from '@/lib/db'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
+import { signVerificationToken } from '@/lib/jwt'
+import { sendVerificationEmail } from '@/lib/email'
 
 const RegisterValidator = z.object({
   email: z.string().email(),
@@ -35,7 +37,16 @@ export async function POST(req: Request) {
       },
     })
 
-    return new Response(JSON.stringify({ id: (user as any).id }), {
+    // Fire-and-forget: send verification email
+    const userId = (user as any).id
+    ;(async () => {
+      try {
+        const token = await signVerificationToken(userId)
+        await sendVerificationEmail(email, token)
+      } catch { /* non-critical */ }
+    })()
+
+    return new Response(JSON.stringify({ id: userId }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },
     })

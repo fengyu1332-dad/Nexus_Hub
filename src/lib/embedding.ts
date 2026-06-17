@@ -81,12 +81,13 @@ export function chunkMarkdown(
 /**
  * 调用 Embedding API 生成文本向量。
  * 需要配置 EMBEDDING_API_KEY（OpenAI 兼容接口）。
- * 失败时抛出异常，调用方应捕获并降级。
+ * API key 缺失时返回空数组（优雅降级），其他错误抛出异常。
  */
 export async function getEmbedding(text: string): Promise<number[]> {
   const apiKey = process.env.EMBEDDING_API_KEY
   if (!apiKey) {
-    throw new Error('Embedding API key not configured')
+    console.warn('[embedding] EMBEDDING_API_KEY not configured — returning empty embedding')
+    return []
   }
   const apiBase =
     process.env.EMBEDDING_API_BASE ||
@@ -109,6 +110,76 @@ export async function getEmbedding(text: string): Promise<number[]> {
 
   const json = await res.json()
   return json.data?.[0]?.embedding || []
+}
+
+/**
+ * 带重试的嵌入生成。指数退避：1s, 2s, 4s。
+ * 401/403 不重试（认证错误重试无意义）。
+ * 超时 10s/次。
+ */
+export async function getEmbeddingWithRetry(
+  text: string,
+  maxRetries = 3,
+  baseDelayMs = 1000
+): Promise<number[]> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 10_000)
+
+      const apiKey = process.env.EMBEDDING_API_KEY
+      if (!apiKey) {
+        console.warn('[embedding] EMBEDDING_API_KEY not configured — skipping')
+        return []
+      }
+
+      const apiBase =
+        process.env.EMBEDDING_API_BASE ||
+        'https://api.openai.com/v1/embeddings'
+      const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small'
+
+      const res = await fetch(apiBase, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, input: text.substring(0, 8000) }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      if (!res.ok) {
+        const status = res.status
+        // Auth errors — don't retry
+        if (status === 401 || status === 403) {
+          console.error(`[embedding] Fatal auth error: ${status}`)
+          return []
+        }
+        const errBody = await res.text()
+        throw new Error(`Embedding API error: ${status} ${errBody}`)
+      }
+
+      const json = await res.json()
+      return json.data?.[0]?.embedding || []
+    } catch (err: any) {
+      lastError = err
+      if (err.name === 'AbortError') {
+        console.warn(`[embedding] Attempt ${attempt + 1} timed out`)
+        lastError = new Error('Request timeout')
+      }
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt)
+        console.warn(`[embedding] Retry ${attempt + 1}/${maxRetries} in ${delay}ms`)
+        await new Promise((r) => setTimeout(r, delay))
+      }
+    }
+  }
+
+  console.error(`[embedding] All ${maxRetries + 1} attempts failed:`, lastError?.message)
+  return []
 }
 
 // ── 检索接口 ─────────────────────────────────────────────

@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     // ── 3. 预加载 subreddit ──────────────────────────────────
     const subMap = new Map<string, string>() // name → id
     const results: { title: string; ok: boolean; id?: string; error?: string }[] = []
+    let autoCommentCount = 0
 
     for (const item of items) {
       try {
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
               },
             })
           }
-          subId = (sub as any).id
+          subId = (sub as any).id as string
           subMap.set(item.subredditName, subId)
         }
 
@@ -79,7 +80,56 @@ export async function POST(req: Request) {
           },
         })
 
-        results.push({ title: item.title, ok: true, id: (post as any).id })
+        const postId = (post as any).id
+        results.push({ title: item.title, ok: true, id: postId })
+
+        // Fire-and-forget: Flora auto-comment (max 5 per batch)
+        if (autoCommentCount < 5) {
+          autoCommentCount++
+          const sName = item.subredditName
+          const aRole = item.authorRole
+          ;(async () => {
+            try {
+              const floraUser = await db.user.findFirst({
+                where: { aiRole: 'Flora', isAI: true },
+              })
+              if (!floraUser) return
+              const { generateWelcomeComment } = await import('@/lib/flora-auto')
+              const comment = await generateWelcomeComment(
+                item.title, item.content.substring(0, 2000), sName, aRole
+              )
+              if (comment) {
+                await db.comment.create({
+                  data: {
+                    text: comment,
+                    authorId: (floraUser as any).id,
+                    postId: postId,
+                  },
+                })
+              }
+            } catch { /* non-critical */ }
+          })()
+        }
+
+        // Fire-and-forget embedding generation
+        const postTitle = item.title
+        const postContent = item.content
+        ;(async () => {
+          try {
+            const { getEmbedding } = await import('@/lib/embedding')
+            const embedding = await getEmbedding(
+              (postTitle + ' ' + postContent).substring(0, 8000)
+            )
+            if (embedding && embedding.length > 0) {
+              await db.post.update({
+                where: { id: postId },
+                data: { embedding: embedding as any },
+              })
+            }
+          } catch {
+            // non-critical — skip
+          }
+        })()
       } catch (err: any) {
         results.push({ title: item.title, ok: false, error: err.message })
       }

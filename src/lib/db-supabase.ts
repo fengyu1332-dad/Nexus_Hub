@@ -135,9 +135,10 @@ export const db = {
     async findMany(opts?: {
       where?: Filter
       select?: Select
-      orderBy?: OrderBy
+      orderBy?: OrderBy | OrderBy[]
       take?: number
       skip?: number
+      include?: Record<string, any>
     }) {
       let query = supabase
         .from('Post')
@@ -145,8 +146,13 @@ export const db = {
 
       // 排序
       if (opts?.orderBy) {
-        for (const [col, dir] of Object.entries(opts.orderBy)) {
-          query = query.order(col, { ascending: dir === 'asc' })
+        const orders = Array.isArray(opts.orderBy)
+          ? opts.orderBy
+          : [opts.orderBy]
+        for (const o of orders) {
+          for (const [col, dir] of Object.entries(o)) {
+            query = query.order(col, { ascending: dir === 'asc' })
+          }
         }
       }
 
@@ -155,6 +161,8 @@ export const db = {
         for (const [col, val] of Object.entries(opts.where)) {
           if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
             query = query.ilike(col, `${(val as any).startsWith}%`)
+          } else if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
+            query = query.ilike(col, `%${(val as any).contains}%`)
           } else if (typeof val === 'object' && val !== null && 'gte' in (val as any)) {
             query = query.gte(col, (val as any).gte)
           } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
@@ -1282,6 +1290,457 @@ export const db = {
     // Fallback: return empty
     console.warn('[db-supabase] Unsupported raw SQL:', sql.substring(0, 100))
     return [] as unknown as T
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  Report
+  // ═══════════════════════════════════════════════════
+
+  report: {
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; skip?: number }) {
+      let query = supabase.from('Report').select('*')
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
+      const { data, error } = await query
+      if (error) throw error
+      return data || []
+    },
+
+    async findFirst(opts: { where: Filter }) {
+      let query = supabase.from('Report').select('*')
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return data?.[0] || null
+    },
+
+    async create(opts: { data: Record<string, unknown> }) {
+      const record = {
+        id: generateId(),
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        ...opts.data,
+      }
+      const { data, error } = await supabase
+        .from('Report')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('Report')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  PipelineExecution
+  // ═══════════════════════════════════════════════════
+
+  pipelineExecution: {
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
+      let query = supabase.from('PipelineExecution').select(buildSelect(opts?.select))
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase.from('PipelineExecution').select(buildSelect(opts?.select))
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return (data?.[0] || null) as any
+    },
+
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, ...opts.data }
+      const { data, error } = await supabase.from('PipelineExecution').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('PipelineExecution')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase.from('PipelineExecution').select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  EmbeddingJob
+  // ═══════════════════════════════════════════════════
+
+  embeddingJob: {
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase.from('EmbeddingJob').select(buildSelect(opts?.select))
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return (data?.[0] || null) as any
+    },
+
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number }) {
+      let query = supabase.from('EmbeddingJob').select('*')
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, updatedAt: now, ...opts.data }
+      const { data, error } = await supabase.from('EmbeddingJob').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('EmbeddingJob')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  PostFeedback
+  // ═══════════════════════════════════════════════════
+
+  postFeedback: {
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, ...opts.data }
+      const { data, error } = await supabase.from('PostFeedback').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase.from('PostFeedback').select(buildSelect(opts?.select))
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return (data?.[0] || null) as any
+    },
+
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
+      let query = supabase.from('PostFeedback').select(buildSelect(opts?.select))
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase.from('PostFeedback').select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('PostFeedback')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  PromptVersion
+  // ═══════════════════════════════════════════════════
+
+  promptVersion: {
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, ...opts.data }
+      const { data, error } = await supabase.from('PromptVersion').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async findFirst(opts: { where: Filter; select?: Select; orderBy?: OrderBy }) {
+      let query = supabase.from('PromptVersion').select(buildSelect(opts?.select))
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return (data?.[0] || null) as any
+    },
+
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
+      let query = supabase.from('PromptVersion').select(buildSelect(opts?.select))
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('PromptVersion')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase.from('PromptVersion').select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  Tag
+  // ═══════════════════════════════════════════════════
+
+  tag: {
+    async findFirst(opts: { where: Filter; select?: Select }) {
+      let query = supabase.from('Tag').select(buildSelect(opts?.select))
+      for (const [col, val] of Object.entries(opts.where)) {
+        query = query.eq(col, val)
+      }
+      const { data, error } = await query.limit(1)
+      if (error) throw error
+      return (data?.[0] || null) as any
+    },
+
+    async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
+      let query = supabase.from('Tag').select(buildSelect(opts?.select))
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
+            query = query.ilike(col, `%${(val as any).contains}%`)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.orderBy) {
+        for (const [col, dir] of Object.entries(opts.orderBy)) {
+          query = query.order(col, { ascending: dir === 'asc' })
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, ...opts.data }
+      const { data, error } = await supabase.from('Tag').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('Tag')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase.from('Tag').select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+
+    async delete(opts: { where: { id: string } }) {
+      const { error } = await supabase.from('Tag').delete().eq('id', opts.where.id)
+      if (error) throw error
+    },
+  },
+
+  // ═══════════════════════════════════════════════════
+  //  PostTag
+  // ═══════════════════════════════════════════════════
+
+  postTag: {
+    async create(opts: { data: Record<string, any> }) {
+      const now = new Date().toISOString()
+      const record = { id: generateId(), createdAt: now, ...opts.data }
+      const { data, error } = await supabase.from('PostTag').insert(record).select().single()
+      if (error) throw error
+      return data
+    },
+
+    async findMany(opts?: { where?: Filter; select?: Select; take?: number }) {
+      let query = supabase.from('PostTag').select(buildSelect(opts?.select))
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
+            query = query.in(col, (val as any).in)
+          } else {
+            query = query.eq(col, val)
+          }
+        }
+      }
+      if (opts?.take) query = query.limit(opts.take)
+      const { data, error } = await query
+      if (error) throw error
+      return (data || []) as any[]
+    },
+
+    async delete(opts: { where: { id: string } }) {
+      const { error } = await supabase.from('PostTag').delete().eq('id', opts.where.id)
+      if (error) throw error
+    },
+
+    async count(opts?: { where?: Filter }) {
+      let query = supabase.from('PostTag').select('id', { count: 'exact', head: true })
+      if (opts?.where) {
+        for (const [col, val] of Object.entries(opts.where)) {
+          query = query.eq(col, val)
+        }
+      }
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
   },
 
   async $executeRawUnsafe(sql: string, ...params: string[]) {
