@@ -128,6 +128,7 @@ model Post {
   comments    Comment[]
   votes       Vote[]
   bookmarks   Bookmark[]
+  tags        PostTag[]
 }
 
 model Comment {
