@@ -19,7 +19,7 @@ const SignIn = () => {
       <p className='px-8 text-center text-sm text-muted-foreground'>
         <Link
           href='/forgot-password'
-          className='hover:text-brand text-sm underline underline-offset-4'>
+          className='text-rose-500 hover:text-rose-600 text-sm underline underline-offset-4 font-medium'>
           {dict.auth.forgotPassword}
         </Link>
       </p>

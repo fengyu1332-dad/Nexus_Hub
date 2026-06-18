@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils'
 import { signIn } from 'next-auth/react'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Icons } from './Icons'
 import { useDict } from '@/components/I18nProvider'
@@ -122,6 +123,13 @@ const UserAuthForm = ({ className, showCredentials, ...props }: UserAuthFormProp
               className='w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 focus:border-rose-400'
               required
             />
+            <div className='flex justify-end'>
+              <Link
+                href='/forgot-password'
+                className='text-rose-500 hover:text-rose-600 text-xs font-medium'>
+                {dict.auth.forgotPassword}
+              </Link>
+            </div>
             <Button
               isLoading={isLoading === 'credentials'}
               type='submit'
