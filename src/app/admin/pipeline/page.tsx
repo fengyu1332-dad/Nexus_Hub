@@ -2,6 +2,7 @@ import { getAdminSession } from '@/lib/auth-admin'
 import { redirect } from 'next/navigation'
 import { getDictionary } from '@/i18n'
 import { PipelineExecutionsList } from '@/components/admin/PipelineExecutionsList'
+import { PipelineStatusCards } from '@/components/admin/PipelineStatusCards'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,9 @@ export default async function PipelinePage() {
   return (
     <div className='space-y-6'>
       <h1 className='text-3xl font-bold text-zinc-900'>{d.pipeline}</h1>
+
+      {/* ── Success Rate Overview ──────────────────────────── */}
+      <PipelineStatusCards />
 
       <section>
         <h2 className='text-lg font-semibold mb-3'>Recent Failures & Dead Letters</h2>

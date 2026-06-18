@@ -6,6 +6,8 @@ import { getDictionary } from '@/i18n'
 import type { DbUser } from '@/lib/types'
 import { AIDashboardClient } from '@/components/admin/AIDashboardClient'
 import { EmbeddingStatusCard } from '@/components/admin/EmbeddingStatusCard'
+import { AnalyticsCharts } from '@/components/admin/AnalyticsCharts'
+import { ContentGapsCard } from '@/components/admin/ContentGapsCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -221,6 +223,13 @@ export default async function AIDashboardPage() {
   return (
     <div className='space-y-8'>
       <h1 className='text-3xl font-bold text-zinc-900'>{d.aiDashboard}</h1>
+
+      {/* ── Analytics Dashboard ──────────────────────────── */}
+      <AnalyticsCharts />
+
+      <hr className='border-zinc-200' />
+
+      {/* ── Embedding Status ─────────────────────────────── */}
       <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
         <EmbeddingStatusCard labels={{
           embeddingStatus: d.embeddingStatus,
@@ -231,6 +240,7 @@ export default async function AIDashboardPage() {
           backfillEmbeddings: d.backfillEmbeddings,
           noEmbeddingKey: d.noEmbeddingKey,
         }} />
+        <ContentGapsCard />
       </div>
       <AIDashboardClient
         initialWorkflows={JSON.parse(JSON.stringify(workflowDetails))}

@@ -46,8 +46,8 @@ export async function GET() {
     })
 
     // Resolve authors and subreddits
-    const authorIds = [...new Set(posts.map((p: any) => p.authorId).filter(Boolean))]
-    const subIds = [...new Set(posts.map((p: any) => p.subredditId).filter(Boolean))]
+    const authorIds = Array.from(new Set(posts.map((p: any) => p.authorId).filter(Boolean)))
+    const subIds = Array.from(new Set(posts.map((p: any) => p.subredditId).filter(Boolean)))
     const authorMap = new Map()
     const subMap = new Map()
 

@@ -813,6 +813,28 @@ export const db = {
       }
     },
 
+    async create(opts: { data: Record<string, any> }) {
+      const record = { id: generateId(), subscribedAt: new Date().toISOString(), ...opts.data }
+      const { data, error } = await supabase
+        .from('NewsletterSubscriber')
+        .insert(record)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async update(opts: { where: { id: string }; data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('NewsletterSubscriber')
+        .update(opts.data)
+        .eq('id', opts.where.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
     async updateMany(opts: {
       where: { email: string }
       data: Record<string, unknown>

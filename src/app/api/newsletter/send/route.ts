@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     })
 
     // Resolve authors and filter to AI only
-    const authorIds = [...new Set((posts || []).map((p: any) => p.authorId).filter(Boolean))]
+    const authorIds = Array.from(new Set((posts || []).map((p: any) => p.authorId).filter(Boolean)))
     const authorMap = new Map()
     for (const aid of authorIds) {
       const u = await db.user.findFirst({
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     }
 
     // Resolve subreddit names
-    const subredditIds = [...new Set((posts || []).map((p: any) => p.subredditId).filter(Boolean))]
+    const subredditIds = Array.from(new Set((posts || []).map((p: any) => p.subredditId).filter(Boolean)))
     const subredditMap = new Map()
     for (const sid of subredditIds) {
       const s = await db.subreddit.findFirst({
@@ -97,11 +97,11 @@ export async function POST(req: Request) {
       )
     }
 
-    // 2. 获取所有 active 订阅者
-    const subs = await db.newsletterSubscriber.findMany({
+    // 2. 获取所有 active 订阅者（含 unsubscribe token）
+    const subs = (await db.newsletterSubscriber.findMany({
       where: { active: true },
-      select: { email: true },
-    })
+      select: { email: true, unsubscribeToken: true },
+    })) as { email: string; unsubscribeToken?: string }[]
 
     if (!subs || subs.length === 0) {
       return new Response(
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
     let sent = 0
     let failed = 0
     for (const sub of subs) {
-      const ok = await sendWeeklyNewsletter(sub.email, items)
+      const ok = await sendWeeklyNewsletter(sub.email, items, sub.unsubscribeToken)
       if (ok) sent++
       else failed++
     }

@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { AdminAgentsList } from '@/components/admin/AdminAgentsList'
 import { PromptVersionEditor } from '@/components/admin/PromptVersionEditor'
+import { AgentPipelineRunner } from '@/components/admin/AgentPipelineRunner'
+import { QualityRewriter } from '@/components/admin/QualityRewriter'
 import { getDictionary } from '@/i18n'
 
 export default async function AdminAIAgentsPage() {
@@ -96,6 +98,19 @@ export default async function AdminAIAgentsPage() {
         qualityScore: dict.aiFeedback.qualityScore,
         helpfulRatio: dict.aiFeedback.helpfulRatio,
       }} />
+
+      <hr className='border-zinc-200' />
+
+      {/* Agent Pipeline Runner */}
+      <AgentPipelineRunner />
+
+      <hr className='border-zinc-200' />
+
+      {/* Quality Rewriter */}
+      <QualityRewriter />
+
+      <hr className='border-zinc-200' />
+
       <PromptVersionEditor labels={{
         title: dict.promptVersion.title,
         agentRole: dict.promptVersion.agentRole,

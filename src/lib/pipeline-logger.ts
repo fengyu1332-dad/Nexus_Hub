@@ -6,7 +6,7 @@ function generateId(): string {
   return `pl_${Date.now().toString(36)}_${_counter.toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-export type PipelineType = 'ai_publish' | 'embedding' | 'flora_auto_reply' | 'crawl' | 'dedup_check' | 'tag_classify' | 'semantic_search' | 'embedding_backfill'
+export type PipelineType = 'ai_publish' | 'embedding' | 'flora_auto_reply' | 'crawl' | 'dedup_check' | 'tag_classify' | 'semantic_search' | 'embedding_backfill' | 'newsletter_send'
 export type PipelineStatus = 'pending' | 'running' | 'success' | 'failed' | 'dead_letter'
 
 export async function createPipelineExecution(
