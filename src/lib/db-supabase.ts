@@ -542,7 +542,11 @@ export const db = {
         .select(buildSelect(opts?.select))
 
       for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
+        if (val === null) {
+          query = query.is(col, null)
+        } else {
+          query = query.eq(col, val)
+        }
       }
 
       const { data, error } = await query.limit(1)
@@ -591,7 +595,11 @@ export const db = {
         .select('id', { count: 'exact', head: true })
       if (opts?.where) {
         for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
+          if (val === null) {
+            query = query.is(col, null)
+          } else {
+            query = query.eq(col, val)
+          }
         }
       }
       const { count, error } = await query
