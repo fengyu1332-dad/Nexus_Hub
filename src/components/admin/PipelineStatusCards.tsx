@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<string, string> = {
   tag_classify: 'Tag Classify',
   semantic_search: 'Semantic',
   newsletter_send: 'Newsletter',
+  atmosphere_builder: 'Atmosphere',
 }
 
 export function PipelineStatusCards() {

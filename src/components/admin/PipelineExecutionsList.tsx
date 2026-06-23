@@ -26,6 +26,9 @@ const TYPE_LABELS: Record<string, string> = {
   dedup_check: 'Dedup',
   tag_classify: 'Tag Classify',
   semantic_search: 'Semantic',
+  embedding_backfill: 'Embed Backfill',
+  newsletter_send: 'Newsletter',
+  atmosphere_builder: 'Atmosphere',
 }
 
 const STATUS_PILL: Record<string, string> = {
