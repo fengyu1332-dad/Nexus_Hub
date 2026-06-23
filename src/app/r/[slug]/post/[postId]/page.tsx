@@ -5,6 +5,8 @@ import PostVoteServer from '@/components/post-vote/PostVoteServer'
 import { InlineMathProcessor } from '@/components/InlineMathProcessor'
 import { RelatedPosts } from '@/components/RelatedPosts'
 import BookmarkButton from '@/components/BookmarkButton'
+import { ReportButton } from '@/components/ReportButton'
+import { PostFeedbackButtons } from '@/components/PostFeedbackButtons'
 import { buttonVariants } from '@/components/ui/Button'
 import { getAuthSession } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -209,6 +211,7 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
               {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
             </p>
             <BookmarkButton postId={params.postId} initialSaved={isSaved} />
+            <ReportButton targetType="post" targetId={params.postId} />
           </div>
           <h1 className='text-xl font-semibold py-2 leading-6 text-gray-900'>
             {post?.title ?? cachedPost?.title}
@@ -250,6 +253,9 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
           <InlineMathProcessor>
             <EditorOutput content={post?.content ?? cachedPost?.content} />
           </InlineMathProcessor>
+          {(post?.author as any)?.isAI && (
+            <PostFeedbackButtons postId={post?.id ?? cachedPost?.id ?? params.postId} />
+          )}
           <Suspense
             fallback={
               <Loader2 className='h-5 w-5 animate-spin text-zinc-500' />

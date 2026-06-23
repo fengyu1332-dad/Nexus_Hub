@@ -54,6 +54,13 @@ export async function PATCH(req: Request) {
       return new Response('Post not found', { status: 404 })
     }
 
+    // Compute base vote count from pre-mutation state
+    const baseAmt = post.votes.reduce((acc, vote) => {
+      if (vote.type === 'UP') return acc + 1
+      if (vote.type === 'DOWN') return acc - 1
+      return acc
+    }, 0)
+
     if (existingVote) {
       // if vote type is the same as existing vote, delete the vote
       if (existingVote.type === voteType) {
@@ -66,12 +73,8 @@ export async function PATCH(req: Request) {
           },
         })
 
-        // Recount the votes
-        const votesAmt = post.votes.reduce((acc, vote) => {
-          if (vote.type === 'UP') return acc + 1
-          if (vote.type === 'DOWN') return acc - 1
-          return acc
-        }, 0)
+        // Remove the deleted vote from count
+        const votesAmt = baseAmt - (existingVote.type === 'UP' ? 1 : -1)
 
         if (votesAmt >= CACHE_AFTER_UPVOTES) {
           const cachePayload: CachedPost = {
@@ -105,12 +108,8 @@ export async function PATCH(req: Request) {
         },
       })
 
-      // Recount the votes
-      const votesAmt = post.votes.reduce((acc, vote) => {
-        if (vote.type === 'UP') return acc + 1
-        if (vote.type === 'DOWN') return acc - 1
-        return acc
-      }, 0)
+      // Replace old vote value with new vote value
+      const votesAmt = baseAmt - (existingVote.type === 'UP' ? 1 : -1) + (voteType === 'UP' ? 1 : -1)
 
       if (votesAmt >= CACHE_AFTER_UPVOTES) {
         const cachePayload: CachedPost = {
@@ -140,12 +139,8 @@ export async function PATCH(req: Request) {
       },
     })
 
-    // Recount the votes
-    const votesAmt = post.votes.reduce((acc, vote) => {
-      if (vote.type === 'UP') return acc + 1
-      if (vote.type === 'DOWN') return acc - 1
-      return acc
-    }, 0)
+    // Add the new vote to count
+    const votesAmt = baseAmt + (voteType === 'UP' ? 1 : -1)
 
     if (votesAmt >= CACHE_AFTER_UPVOTES) {
       const cachePayload: CachedPost = {

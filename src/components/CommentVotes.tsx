@@ -106,7 +106,7 @@ const CommentVotes: FC<CommentVotesProps> = ({
         onClick={() => vote('DOWN')}
         size='xs'
         className={cn({
-          'text-emerald-500': currentVote?.type === 'DOWN',
+          'text-red-500': currentVote?.type === 'DOWN',
         })}
         variant='ghost'
         aria-label='downvote'>
