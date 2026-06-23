@@ -124,6 +124,68 @@ async function resolvePostIncludes(
   }))
 }
 
+async function resolveCommentIncludes(
+  comments: any[],
+  include: Record<string, any>
+): Promise<any[]> {
+  if (!comments.length) return comments
+
+  const commentIds = comments.map((c) => c.id)
+
+  // Collect unique author IDs
+  const authorMap = new Map<string, any>()
+  if (include.author) {
+    const authorIds = [...new Set(comments.map((c) => c.authorId).filter(Boolean))]
+    if (authorIds.length > 0) {
+      const { data: users } = await supabase
+        .from('User')
+        .select('*')
+        .in('id', authorIds)
+      for (const u of users || []) {
+        if (u) authorMap.set(u.id, u)
+      }
+    }
+  }
+
+  // Fetch CommentVotes for all comments
+  let allVotes: any[] = []
+  if (include.votes) {
+    const { data } = await supabase
+      .from('CommentVote')
+      .select('*')
+      .in('commentId', commentIds)
+    allVotes = data || []
+  }
+
+  // Resolve nested replies with their own includes
+  let allReplies: any[] = []
+  if (include.replies) {
+    const { data } = await supabase
+      .from('Comment')
+      .select('*')
+      .in('replyToId', commentIds)
+      .order('createdAt', { ascending: true })
+    allReplies = data || []
+
+    // Recursively resolve reply includes
+    // Prisma format: { replies: { include: { author: true } } }
+    // Flat format: { replies: { author: true } }
+    if (allReplies.length > 0 && typeof include.replies === 'object') {
+      const replyInclude = include.replies.include || include.replies
+      allReplies = await resolveCommentIncludes(allReplies, replyInclude)
+    }
+  }
+
+  return comments.map((c) => ({
+    ...c,
+    author: include.author ? authorMap.get(c.authorId) || null : undefined,
+    votes: include.votes ? allVotes.filter((v) => v.commentId === c.id) : undefined,
+    replies: include.replies
+      ? allReplies.filter((r) => r.replyToId === c.id)
+      : undefined,
+  }))
+}
+
 // ── 导出对象 ──────────────────────────────────────────
 
 export const db = {
@@ -703,7 +765,13 @@ export const db = {
   // ═══════════════════════════════════════════════════
 
   comment: {
-    async findMany(opts: { where: Filter; select?: Select; orderBy?: OrderBy }) {
+    async findMany(opts: {
+      where: Filter
+      select?: Select
+      orderBy?: OrderBy
+      include?: Record<string, any>
+      take?: number
+    }) {
       let query = supabase
         .from('Comment')
         .select(buildSelect(opts?.select))
@@ -714,12 +782,26 @@ export const db = {
         }
       }
       for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
+        if (val === null) {
+          query = query.is(col, null)
+        } else {
+          query = query.eq(col, val)
+        }
       }
+      if (opts?.take) query = query.limit(opts.take)
 
       const { data, error } = await query
       if (error) throw error
-      return data || []
+      if (!data?.length) return []
+
+      let comments = data as any[]
+
+      // Resolve include relations (batch)
+      if (opts?.include) {
+        comments = await resolveCommentIncludes(comments, opts.include)
+      }
+
+      return comments
     },
 
     async findFirst(opts: { where: Filter; select?: Select }) {
@@ -728,7 +810,11 @@ export const db = {
         .select(buildSelect(opts?.select))
 
       for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
+        if (val === null) {
+          query = query.is(col, null)
+        } else {
+          query = query.eq(col, val)
+        }
       }
 
       const { data, error } = await query.limit(1)
@@ -753,7 +839,11 @@ export const db = {
         .select('id', { count: 'exact', head: true })
       if (opts?.where) {
         for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
+          if (val === null) {
+            query = query.is(col, null)
+          } else {
+            query = query.eq(col, val)
+          }
         }
       }
       const { count, error } = await query
