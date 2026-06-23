@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { shouldReplyToComment } from '@/lib/flora-auto'
+import { validateContent } from '@/lib/encoding'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,10 +122,15 @@ export async function POST(req: Request) {
       })
 
       if (decision.shouldReply && decision.reply) {
+        const validated = validateContent(decision.reply, 'flora-reply')
+        if (!validated.valid || !validated.text.trim()) {
+          console.warn('[flora-auto-reply] Reply validation failed:', validated.warning)
+          continue
+        }
         try {
           await db.comment.create({
             data: {
-              text: decision.reply,
+              text: validated.text,
               authorId: floraUser.id,
               postId: (comment as any).postId,
               replyToId: (comment as any).id,

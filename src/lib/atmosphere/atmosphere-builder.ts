@@ -12,6 +12,7 @@ import {
 import { loadAtmosphereConfig, getDueActions, getPostFilters } from './atmosphere-rules'
 import { generateComment } from './comment-generator'
 import { extractPostSummary } from '@/lib/flora-auto'
+import { validateContent } from '@/lib/encoding'
 import type {
   AtmosphereConfig,
   AtmosphereAction,
@@ -353,9 +354,18 @@ async function executeAction(
       }
     }
 
+    // Encoding validation and repair
+    const validated = validateContent(commentText, `${action.role}-comment`)
+    if (!validated.valid) {
+      return {
+        postId, role: action.role, style: action.style,
+        executed: false, reasonSkipped: 'Comment encoding invalid',
+      }
+    }
+
     const comment = await db.comment.create({
       data: {
-        text: commentText,
+        text: validated.text,
         authorId,
         postId,
         replyToId: action.replyToCommentId || undefined,

@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { markdownToEditorJS } from '@/lib/markdown'
 import { AIPublishValidator } from '@/lib/validators/ai-post'
 import { createPipelineExecution, markPipelineSuccess, markPipelineFailed } from '@/lib/pipeline-logger'
+import { validateContent } from '@/lib/encoding'
 import { z } from 'zod'
 
 export async function POST(req: Request) {
@@ -14,8 +15,30 @@ export async function POST(req: Request) {
       return new Response('Unauthorized', { status: 401 })
     }
 
-    const { title, content, subredditName, authorRole, contentHash, sourceId } =
+    let { title, content, subredditName, authorRole, contentHash, sourceId } =
       AIPublishValidator.parse(body)
+
+    // ── 1b. 编码校验与修复 ─────────────────────────────────────
+    const titleCheck = validateContent(title, 'title')
+    if (!titleCheck.valid) {
+      return new Response(
+        JSON.stringify({ error: 'Title validation failed', reason: titleCheck.warning }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    title = titleCheck.text
+
+    const contentCheck = validateContent(content, 'content')
+    if (!contentCheck.valid) {
+      return new Response(
+        JSON.stringify({ error: 'Content validation failed', reason: contentCheck.warning }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    if (contentCheck.warning) {
+      console.warn('[ai-publish] Content had encoding issues, auto-repaired')
+    }
+    content = contentCheck.text
 
     // ── 2. 内容查重（三重保障）───────────────────────────────
     // 2a. CrawlLog contentHash 命中（管道日志级去重）
@@ -174,14 +197,19 @@ export async function POST(req: Request) {
             title, postSummary, subredditName, authorRole
           )
           if (comment) {
-            await db.comment.create({
-              data: {
-                text: comment,
-                authorId: (floraUser as any).id,
-                postId: postId,
-              },
-            })
-            console.log('[ai-publish] Flora auto-commented on:', postId)
+            const validated = validateContent(comment, 'flora-welcome')
+            if (validated.valid && validated.text.trim()) {
+              await db.comment.create({
+                data: {
+                  text: validated.text,
+                  authorId: (floraUser as any).id,
+                  postId: postId,
+                },
+              })
+              console.log('[ai-publish] Flora auto-commented on:', postId)
+            } else {
+              console.warn('[ai-publish] Flora comment validation failed:', validated.warning)
+            }
           }
           await markPipelineSuccess(execId, comment ? 'Comment created' : 'No comment needed')
         } catch (e) {
