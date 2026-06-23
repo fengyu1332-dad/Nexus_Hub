@@ -86,7 +86,7 @@ const GeneralFeed = async ({ sort }: { sort?: string }) => {
     }
   }
 
-  return <PostFeed initialPosts={posts} sort={sort || 'hot'} savedPostIds={savedPostIds} />
+  return <PostFeed initialPosts={posts} sort={sort || 'new'} savedPostIds={savedPostIds} />
 }
 
 export default GeneralFeed

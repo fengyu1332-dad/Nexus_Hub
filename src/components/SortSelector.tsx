@@ -10,17 +10,17 @@ const SortSelector = () => {
   const searchParams = useSearchParams()
   const dict = useDict()
 
-  const currentSort = searchParams.get('sort') || 'hot'
+  const currentSort = searchParams.get('sort') || 'new'
 
   const options = [
-    { value: 'hot', label: dict.sort.hot },
     { value: 'new', label: dict.sort.new },
+    { value: 'hot', label: dict.sort.hot },
     { value: 'top', label: dict.sort.top },
   ]
 
   const handleSort = (value: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value === 'hot') {
+    if (value === 'new') {
       params.delete('sort')
     } else {
       params.set('sort', value)

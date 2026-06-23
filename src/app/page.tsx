@@ -16,7 +16,7 @@ export default async function Home({
   searchParams: { [key: string]: string | string[] | undefined }
 }) {
   const dict = getDictionary()
-  const sort = (searchParams.sort as string) || 'hot'
+  const sort = (searchParams.sort as string) || 'new'
 
   return (
     <>
