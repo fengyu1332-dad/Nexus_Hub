@@ -1,168 +1,135 @@
-/**
- * Comment Generator — 调用 DeepSeek 生成符合角色人设的评论
- */
-import { getPersonaPrompt } from './persona-comments'
-import type { AtmosphereRole, AtmosphereStyle } from './types'
+import { getCommentPrompt } from './persona-comments'
+import { validateContent } from '@/lib/encoding'
+import type { AtmosphereAction, AiCommentContext } from './types'
 
 const DEEPSEEK_BASE = process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/chat/completions'
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat'
 const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || ''
 
-interface PostContext {
-  title: string
-  content: string
-  subredditName: string
-  authorRole: string
-}
-
-interface CommentContext {
-  role: string
-  text: string
-  authorRole: string
-}
-
-async function callDeepSeek(messages: { role: string; content: string }[], maxTokens = 256): Promise<string> {
+async function callDeepSeek(
+  messages: { role: string; content: string }[],
+  maxTokens = 256
+): Promise<string> {
   if (!DEEPSEEK_KEY) return ''
-
-  const res = await fetch(DEEPSEEK_BASE, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_KEY}`,
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      temperature: 0.8,
-      max_tokens: maxTokens,
-      stream: false,
-      messages,
-    }),
-  })
-
-  if (!res.ok) {
-    console.warn('[comment-generator] DeepSeek error:', res.status)
+  try {
+    const res = await fetch(DEEPSEEK_BASE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${DEEPSEEK_KEY}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        temperature: 0.8,
+        max_tokens: maxTokens,
+        stream: false,
+        messages,
+      }),
+    })
+    if (!res.ok) {
+      console.warn('[atmosphere] DeepSeek error:', res.status)
+      return ''
+    }
+    const json = await res.json()
+    return json.choices?.[0]?.message?.content || ''
+  } catch (e) {
+    console.warn('[atmosphere] DeepSeek fetch error:', e)
     return ''
   }
-
-  const json = await res.json()
-  return json.choices?.[0]?.message?.content || ''
 }
 
 /**
- * 为指定角色生成一条评论
+ * Build the user message with post context and existing discussion.
  */
-export async function generateComment(
-  role: AtmosphereRole,
-  post: PostContext,
-  existingAiComments: CommentContext[],
-  style: AtmosphereStyle,
-  replyToText?: string,
-  replyToRole?: string
-): Promise<string> {
-  if (!DEEPSEEK_KEY) {
-    return generateFallbackComment(role, post, style)
-  }
+function buildContextMessage(action: AtmosphereAction): string {
+  const parts: string[] = []
+  parts.push(`文章标题：${action.postTitle}`)
 
-  const personaPrompt = getPersonaPrompt(role, style === 'reply' ? 'reply' : 'comment')
-  if (!personaPrompt || personaPrompt === 'Flora') {
-    // Flora 的评论外部已处理
-    return generateFallbackComment(role, post, style)
-  }
-
-  // 构建上下文：帖子信息 + 已有的 AI 评论
-  let contextPrompt = `## 帖子信息
-板块：${post.subredditName}
-作者：AI-${post.authorRole}
-标题：${post.title}
-内容摘要：${extractPlainText(post.content).substring(0, 2000)}
-`
-
-  if (existingAiComments.length > 0) {
-    contextPrompt += `\n## 本条帖子已有的 AI 角色评论
-${existingAiComments.map((c) => `[${c.authorRole}]: ${c.text.substring(0, 300)}`).join('\n')}
-`
-  }
-
-  if (replyToText) {
-    contextPrompt += `\n## 你要回复的这条评论
-[${replyToRole || 'unknown'}]: ${replyToText.substring(0, 500)}
-`
-  }
-
-  contextPrompt += `\n请根据以上内容，以你的人物设定发表一条${style === 'reply' ? '回复' : '评论'}：`
-
+  // Extract first ~600 chars of post content
   try {
-    const result = await callDeepSeek([
-      { role: 'system', content: personaPrompt },
-      { role: 'user', content: contextPrompt },
-    ], 300)
-
-    return result || generateFallbackComment(role, post, style)
+    const parsed = typeof action.postContent === 'string'
+      ? JSON.parse(action.postContent)
+      : action.postContent
+    const text = (parsed as any)?.blocks
+      ?.map((b: any) => b.data?.text || '')
+      .join('\n')
+      .slice(0, 600) || ''
+    if (text) parts.push(`文章摘要：${text}`)
   } catch {
-    return generateFallbackComment(role, post, style)
+    parts.push(`文章内容：${String(action.postContent).slice(0, 600)}`)
   }
+
+  // Include existing AI comments for context
+  if (action.existingAiComments.length > 0) {
+    const recentComments = action.existingAiComments.slice(-5)
+    parts.push('\n已有讨论：')
+    for (const c of recentComments) {
+      parts.push(`[${c.authorRole}]：${c.text.slice(0, 150)}`)
+    }
+  }
+
+  // For replies, highlight the target comment
+  if (action.style === 'reply' && action.replyToCommentText) {
+    parts.push(`\n你要回复的是 [${action.replyToAuthorRole}] 的评论：${action.replyToCommentText}`)
+  }
+
+  return parts.join('\n')
 }
 
-/**
- * Fallback 评论模板 —— 当 DeepSeek API 调用失败时使用
- */
-function generateFallbackComment(
-  role: AtmosphereRole,
-  post: PostContext,
-  style: AtmosphereStyle
-): string {
-  const title = post.title || '这篇文章'
-
-  if (style === 'reply') {
-    const replyTemplates: Record<string, string[]> = {
-      Newton: [
-        `你这个角度很有意思！我在备考的时候也注意到了类似的现象。从学生的实际体验来说，数据是一方面，但执行过程中还有很多细节值得深挖。`,
-        `说得对，补充一个我自己的观察：很多同学在准备阶段会忽略时间管理这个维度。你觉得呢？`,
-      ],
-      Midas: [
-        `数据分析的角度很准。从搜索趋势来看，这个方向确实在上升期。建议搭配一些关键词工具来验证。`,
-        `这个观点我赞同。从流量数据上看，相关内容最近三个月的搜索量有明显增长，值得深入做。`,
-      ],
-      Flora: [
-        `学姐们的讨论真的让人受益匪浅！我想问一下，对于刚开始准备的同学，有什么入门建议吗？🌸`,
-        `看了大家的讨论，感觉学到了很多。作为学妹，我想补充一个可能被忽略的角度～`,
-      ],
-    }
-    const templates = replyTemplates[role] || ['']
-    return templates[Math.floor(Math.random() * templates.length)]
-  }
-
-  const commentTemplates: Record<string, string[]> = {
+/** Fallback templates when DeepSeek API is unavailable */
+function getFallbackComment(action: AtmosphereAction): string {
+  const fallbacks: Record<string, string[]> = {
     Newton: [
-      `写得不错！从数据角度来看，这个话题还有一个被很多人忽略的维度。我在准备阶段也踩过类似的坑——看起来简单，实际操作中细节决定成败。大家有没有遇到过类似的情况？`,
-      `这个话题选得很有价值。补充一个我在备考中的真实观察：很多同学容易在不该花时间的地方死磕。建议大家先做一套真题摸底，再针对性补弱。你们怎么分配时间的？`,
+      '这篇文章的角度很有意思！从数据上看，这个话题还有很多值得深挖的地方。大家觉得这个趋势会怎么发展？',
+      '写得很到位，特别是提到的方法论部分。我在备考的时候也发现过类似的问题，有没有人遇到过同样的情况？',
     ],
     Midas: [
-      `好内容。从搜索数据来看，这类话题最近的搜索量一直在涨。建议关注一下几个长尾变体关键词，可能会有意想不到的流量。`,
-      `实操性不错。补充一个工具推荐：用这个思路搭配关键词规划师，能更精准地定位目标人群的搜索意图。`,
+      '干货！从搜索趋势来看，这个话题最近热度一直在涨。推荐大家用 Google Trends 关注一下相关关键词的搜索量变化。',
+      '实操角度补充一下：除了文章提到的方法，还可以试试 SEMrush 的相关词分析，能找到不少别人忽略的长尾词。',
     ],
     Flora: [
-      `写得真好！作为正在准备留学的一员，这类内容真的太有帮助了。想问一下大家，你们在准备过程中遇到的最大的困难是什么呢？`,
-      `干货满满！我刚好最近也在关注这个话题。大家如果有什么补充的经验，欢迎在评论区分享呀～`,
+      '大家讨论得好深入啊！作为一个经常在这潜水的人，感觉学到了很多。有没有跟我一样被种草的小伙伴 🙋',
+      '太喜欢看大家的讨论了，每个人都有自己的角度。走过的路过的，别光看呀，也分享下你的经历呗～',
     ],
   }
 
-  const templates = commentTemplates[role] || commentTemplates['Flora']
-  return templates[Math.floor(Math.random() * templates.length)]
+  const pool = fallbacks[action.role] || fallbacks.Flora
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
-/** 从 EditorJS JSON 中提取纯文本 */
-function extractPlainText(content: unknown): string {
-  try {
-    const parsed = typeof content === 'string' ? JSON.parse(content) : content
-    const blocks = (parsed as any)?.blocks
-    if (!Array.isArray(blocks)) return typeof content === 'string' ? content : ''
-    return blocks
-      .map((b: any) => b.data?.text || '')
-      .join(' ')
-      .replace(/<[^>]+>/g, '')
-      .substring(0, 3000)
-  } catch {
-    return typeof content === 'string' ? content : ''
+/**
+ * Generate a single AI comment via DeepSeek.
+ * Falls back to template if API fails.
+ */
+export async function generateComment(
+  action: AtmosphereAction
+): Promise<string> {
+  const systemPrompt = getCommentPrompt(action.role, action.style === 'reply')
+  const contextMessage = buildContextMessage(action)
+
+  if (!DEEPSEEK_KEY) {
+    console.warn('[atmosphere] DEEPSEEK_API_KEY not configured, using fallback')
+    return getFallbackComment(action)
   }
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: contextMessage },
+  ]
+
+  const raw = await callDeepSeek(messages, 256)
+
+  if (!raw) {
+    console.warn('[atmosphere] DeepSeek returned empty, using fallback')
+    return getFallbackComment(action)
+  }
+
+  // Validate and clean the generated text
+  const validated = validateContent(raw, 'atmosphere-comment')
+  if (!validated.valid || !validated.text.trim()) {
+    console.warn('[atmosphere] Comment validation failed:', validated.warning)
+    return getFallbackComment(action)
+  }
+
+  return validated.text.trim()
 }
