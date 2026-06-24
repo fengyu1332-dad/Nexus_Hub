@@ -649,13 +649,22 @@ export const db = {
       return data?.[0] || null
     },
 
+    async create(opts: { data: Record<string, unknown> }) {
+      const { data, error } = await supabase
+        .from('Vote')
+        .insert(opts.data)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
     async upsert(opts: {
       where: { userId_postId: { userId: string; postId: string } }
       update: Record<string, unknown>
       create: Record<string, unknown>
     }) {
       const { userId, postId } = opts.where.userId_postId
-      // Try update first
       const { data: existing } = await supabase
         .from('Vote')
         .select('*')

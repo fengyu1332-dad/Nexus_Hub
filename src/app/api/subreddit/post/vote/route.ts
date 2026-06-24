@@ -12,8 +12,9 @@ function computeHotScore(votesAmt: number, createdAt: Date): number {
     + (createdAt.getTime() / 1000 - 1134028003) / 45000
 }
 
-async function updatePostScore(postId: string, votesAmt: number, createdAt: Date) {
-  const hotScore = computeHotScore(votesAmt, createdAt)
+async function updatePostScore(postId: string, votesAmt: number, createdAt: Date | string) {
+  const ctime = createdAt instanceof Date ? createdAt : new Date(createdAt)
+  const hotScore = computeHotScore(votesAmt, ctime)
   await db.post.update({
     where: { id: postId },
     data: { voteCount: votesAmt, hotScore },
