@@ -55,15 +55,35 @@ export function getDueActions(
   for (const slot of config.slots) {
     if (actions.length >= 3) break // max 3 actions per post per run
 
-    // Check time window
-    if (hoursSincePost < slot.minHours || hoursSincePost >= slot.maxHours) continue
+    // Cold start: top-level comment slots on posts with 0 AI comments
+    // only enforce minHours (no maxHours), so Newton/Midas can seed the reply chain
+    const isColdStart = slot.style === 'comment' && aiCount === 0
+
+    // Check whether the reply-to target comment already exists
+    const replyTarget = slot.style === 'reply' && slot.replyTo
+      ? existingAiComments.find((c) => c.authorRole === slot.replyTo)
+      : null
+
+    // Check time window:
+    // - Always enforce minHours (minimum wait)
+    // - Skip maxHours for cold start AND for slots that have a valid reply target
+    if (hoursSincePost < slot.minHours) continue
+    if (!isColdStart && !replyTarget && hoursSincePost >= slot.maxHours) continue
 
     // Check minimum AI comment count requirement
     if (slot.requiresExistingCount && aiCount < slot.requiresExistingCount) continue
 
     // Check if this role+slot combination already fired
     const alreadyFired = existingAiComments.some((c) => {
-      // Match by role and approximate time window
+      if (isColdStart) {
+        // For cold start, prevent duplicate top-level comments from the same role
+        return c.authorRole === slot.role && !c.isReplyToId
+      }
+      if (replyTarget && c.authorRole === slot.role) {
+        // For reply slots: already fired if this role already replied to the same target
+        return c.replyToId === (replyTarget as any).id
+      }
+      // Match by role and approximate time window (normal path)
       const commentTime = new Date(c.createdAt).getTime()
       const commentHoursSincePost = (commentTime - postTime) / (1000 * 60 * 60)
       return (
@@ -83,19 +103,14 @@ export function getDueActions(
       existingAiComments,
     }
 
-    // For reply-style slots, find the target comment to reply to
+    // For reply-style slots, use the pre-computed reply target
     if (slot.style === 'reply' && slot.replyTo) {
-      const targetComment = existingAiComments.find(
-        (c) => c.authorRole === slot.replyTo
-      )
-      if (targetComment && Math.random() < config.replyProbability) {
-        action.replyToCommentId = targetComment.id
-        action.replyToCommentText = targetComment.text
-        action.replyToAuthorRole = targetComment.authorRole
+      if (replyTarget && Math.random() < config.replyProbability) {
+        action.replyToCommentId = (replyTarget as any).id
+        action.replyToCommentText = replyTarget.text
+        action.replyToAuthorRole = replyTarget.authorRole
       } else {
-        // No suitable reply target — skip this slot or fall back to top-level comment
-        if (!targetComment) continue
-        // Has target but probability check failed
+        if (!replyTarget) continue
         continue
       }
     }
