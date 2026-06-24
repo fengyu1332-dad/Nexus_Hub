@@ -47,16 +47,15 @@ async function getEligiblePosts(config: AtmosphereConfig): Promise<
 > {
   const lookbackDate = new Date()
   lookbackDate.setDate(lookbackDate.getDate() - config.lookbackDays)
-  const lookbackTime = lookbackDate.getTime()
 
   const posts = (await db.post.findMany({
+    where: { createdAt: { gte: lookbackDate.toISOString() } },
     select: { id: true, title: true, content: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
     take: 30,
   })) as { id: string; title: string; content: string; createdAt: string }[]
 
-  // Filter in JS — Supabase REST adapter's .eq() doesn't support gte/lte range queries
-  return posts.filter((p) => new Date(p.createdAt).getTime() >= lookbackTime)
+  return posts
 }
 
 /**

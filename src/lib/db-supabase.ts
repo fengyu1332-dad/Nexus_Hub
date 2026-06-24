@@ -55,6 +55,39 @@ function buildSelect(fields?: Select): string {
     .join(',')
 }
 
+// ── 通用 WHERE 子句构建 ────────────────────────────
+
+/** Apply Prisma-style where filters to a Supabase query. */
+function applyWhere(query: any, where: Filter) {
+  for (const [col, val] of Object.entries(where)) {
+    if (val === null) {
+      query = query.is(col, null)
+    } else if (typeof val === 'object' && val !== null) {
+      const v = val as Record<string, unknown>
+      if ('in' in v && Array.isArray(v.in)) {
+        query = query.in(col, v.in as string[])
+      } else if ('gte' in v) {
+        query = query.gte(col, v.gte)
+        if ('lte' in v) query = query.lte(col, v.lte)
+      } else if ('gt' in v) {
+        query = query.gt(col, v.gt)
+        if ('lt' in v) query = query.lt(col, v.lt)
+      } else if ('not' in v) {
+        query = query.not(col, 'eq', v.not)
+      } else if ('startsWith' in v) {
+        query = query.ilike(col, `${v.startsWith}%`)
+      } else if ('contains' in v) {
+        query = query.ilike(col, `%${v.contains}%`)
+      } else {
+        query = query.eq(col, val)
+      }
+    } else {
+      query = query.eq(col, val)
+    }
+  }
+  return query
+}
+
 // ── Include 批量解析 ─────────────────────────────────
 
 async function resolvePostIncludes(
@@ -218,22 +251,7 @@ export const db = {
         }
       }
 
-      // 过滤
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
-            query = query.ilike(col, `${(val as any).startsWith}%`)
-          } else if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
-            query = query.ilike(col, `%${(val as any).contains}%`)
-          } else if (typeof val === 'object' && val !== null && 'gte' in (val as any)) {
-            query = query.gte(col, (val as any).gte)
-          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
 
       if (opts?.take) query = query.limit(opts.take)
       if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
@@ -256,15 +274,7 @@ export const db = {
         .from('Post')
         .select(buildSelect(opts?.select))
 
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
-            query = query.ilike(col, `${(val as any).startsWith}%`)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -370,11 +380,7 @@ export const db = {
       let query = supabase
         .from('Post')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -401,13 +407,7 @@ export const db = {
     }) {
       // 1. 先查 Subreddit
       let query = supabase.from('Subreddit').select('*')
-      for (const [col, val] of Object.entries(opts.where)) {
-        if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
-          query = query.ilike(col, `${(val as any).startsWith}%`)
-        } else {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts.where) query = applyWhere(query, opts.where)
       const { data: sub, error } = await query.limit(1).single()
       if (error) {
         if (error.code === 'PGRST116') return null
@@ -479,17 +479,7 @@ export const db = {
         .from('Subreddit')
         .select(buildSelect(opts?.select))
 
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'startsWith' in (val as any)) {
-            query = query.ilike(col, `${(val as any).startsWith}%`)
-          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
 
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
@@ -520,11 +510,7 @@ export const db = {
       let query = supabase
         .from('Subreddit')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -541,13 +527,7 @@ export const db = {
         .from('User')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        if (val === null) {
-          query = query.is(col, null)
-        } else {
-          query = query.eq(col, val)
-        }
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query.limit(1)
       if (error) throw error
@@ -570,17 +550,7 @@ export const db = {
           query = query.order(col, { ascending: dir === 'asc' })
         }
       }
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
-            query = query.ilike(col, `%${(val as any).contains}%`)
-          } else if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.take) query = query.limit(opts.take)
       if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
 
@@ -593,15 +563,7 @@ export const db = {
       let query = supabase
         .from('User')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (val === null) {
-            query = query.is(col, null)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -798,13 +760,7 @@ export const db = {
           query = query.order(col, { ascending: dir === 'asc' })
         }
       }
-      for (const [col, val] of Object.entries(opts.where)) {
-        if (val === null) {
-          query = query.is(col, null)
-        } else {
-          query = query.eq(col, val)
-        }
-      }
+      query = applyWhere(query, opts.where)
       if (opts?.take) query = query.limit(opts.take)
 
       const { data, error } = await query
@@ -826,13 +782,7 @@ export const db = {
         .from('Comment')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        if (val === null) {
-          query = query.is(col, null)
-        } else {
-          query = query.eq(col, val)
-        }
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query.limit(1)
       if (error) throw error
@@ -854,15 +804,7 @@ export const db = {
       let query = supabase
         .from('Comment')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (val === null) {
-            query = query.is(col, null)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -879,9 +821,7 @@ export const db = {
         .from('NewsletterSubscriber')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query
       if (error) throw error
@@ -964,9 +904,7 @@ export const db = {
         .from('Subscription')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query.limit(1)
       if (error) throw error
@@ -978,9 +916,7 @@ export const db = {
         .from('Subscription')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query
       if (error) throw error
@@ -1025,9 +961,7 @@ export const db = {
         .from('Notification')
         .select(buildSelect(opts?.include ? undefined : undefined))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       // Handle orderBy as object or array
       const orders = Array.isArray(opts.orderBy)
@@ -1102,9 +1036,7 @@ export const db = {
       let query = supabase
         .from('Notification')
         .update(opts.data)
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { error } = await query
       if (error) throw error
     },
@@ -1120,9 +1052,7 @@ export const db = {
         .from('Bookmark')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       const { data, error } = await query.limit(1)
       if (error) throw error
@@ -1139,9 +1069,7 @@ export const db = {
         .from('Bookmark')
         .select(buildSelect(opts?.select))
 
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
 
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
@@ -1199,15 +1127,7 @@ export const db = {
         }
       }
 
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
 
       if (opts?.take) query = query.limit(opts.take)
       if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
@@ -1219,9 +1139,7 @@ export const db = {
 
     async findFirst(opts: { where: Filter }) {
       let query = supabase.from('IntelSource').select('*')
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return data?.[0] || null
@@ -1265,11 +1183,7 @@ export const db = {
       let query = supabase
         .from('IntelSource')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1295,11 +1209,7 @@ export const db = {
         }
       }
 
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
 
       if (opts?.take) query = query.limit(opts.take)
       if (opts?.skip) query = query.range(opts.skip, opts.skip + (opts.take || 20) - 1)
@@ -1324,11 +1234,7 @@ export const db = {
       let query = supabase
         .from('CrawlLog')
         .select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1342,11 +1248,7 @@ export const db = {
   pipelineConfig: {
     async findMany(opts?: { where?: Filter }) {
       let query = supabase.from('PipelineConfig').select('*')
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { data, error } = await query
       if (error) throw error
       return data || []
@@ -1428,11 +1330,7 @@ export const db = {
   report: {
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; skip?: number }) {
       let query = supabase.from('Report').select('*')
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1447,9 +1345,7 @@ export const db = {
 
     async findFirst(opts: { where: Filter }) {
       let query = supabase.from('Report').select('*')
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return data?.[0] || null
@@ -1490,15 +1386,7 @@ export const db = {
   pipelineExecution: {
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
       let query = supabase.from('PipelineExecution').select(buildSelect(opts?.select))
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1512,9 +1400,7 @@ export const db = {
 
     async findFirst(opts: { where: Filter; select?: Select }) {
       let query = supabase.from('PipelineExecution').select(buildSelect(opts?.select))
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return (data?.[0] || null) as any
@@ -1541,11 +1427,7 @@ export const db = {
 
     async count(opts?: { where?: Filter }) {
       let query = supabase.from('PipelineExecution').select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1559,9 +1441,7 @@ export const db = {
   embeddingJob: {
     async findFirst(opts: { where: Filter; select?: Select }) {
       let query = supabase.from('EmbeddingJob').select(buildSelect(opts?.select))
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return (data?.[0] || null) as any
@@ -1569,11 +1449,7 @@ export const db = {
 
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number }) {
       let query = supabase.from('EmbeddingJob').select('*')
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1620,9 +1496,7 @@ export const db = {
 
     async findFirst(opts: { where: Filter; select?: Select }) {
       let query = supabase.from('PostFeedback').select(buildSelect(opts?.select))
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return (data?.[0] || null) as any
@@ -1630,15 +1504,7 @@ export const db = {
 
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
       let query = supabase.from('PostFeedback').select(buildSelect(opts?.select))
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1652,11 +1518,7 @@ export const db = {
 
     async count(opts?: { where?: Filter }) {
       let query = supabase.from('PostFeedback').select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1689,9 +1551,7 @@ export const db = {
 
     async findFirst(opts: { where: Filter; select?: Select; orderBy?: OrderBy }) {
       let query = supabase.from('PromptVersion').select(buildSelect(opts?.select))
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1704,15 +1564,7 @@ export const db = {
 
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
       let query = supabase.from('PromptVersion').select(buildSelect(opts?.select))
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1737,11 +1589,7 @@ export const db = {
 
     async count(opts?: { where?: Filter }) {
       let query = supabase.from('PromptVersion').select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1755,9 +1603,7 @@ export const db = {
   tag: {
     async findFirst(opts: { where: Filter; select?: Select }) {
       let query = supabase.from('Tag').select(buildSelect(opts?.select))
-      for (const [col, val] of Object.entries(opts.where)) {
-        query = query.eq(col, val)
-      }
+      query = applyWhere(query, opts.where)
       const { data, error } = await query.limit(1)
       if (error) throw error
       return (data?.[0] || null) as any
@@ -1765,17 +1611,7 @@ export const db = {
 
     async findMany(opts?: { where?: Filter; orderBy?: OrderBy; take?: number; select?: Select }) {
       let query = supabase.from('Tag').select(buildSelect(opts?.select))
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else if (typeof val === 'object' && val !== null && 'contains' in (val as any)) {
-            query = query.ilike(col, `%${(val as any).contains}%`)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.orderBy) {
         for (const [col, dir] of Object.entries(opts.orderBy)) {
           query = query.order(col, { ascending: dir === 'asc' })
@@ -1808,11 +1644,7 @@ export const db = {
 
     async count(opts?: { where?: Filter }) {
       let query = supabase.from('Tag').select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
@@ -1839,15 +1671,7 @@ export const db = {
 
     async findMany(opts?: { where?: Filter; select?: Select; take?: number }) {
       let query = supabase.from('PostTag').select(buildSelect(opts?.select))
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          if (typeof val === 'object' && val !== null && 'in' in (val as any)) {
-            query = query.in(col, (val as any).in)
-          } else {
-            query = query.eq(col, val)
-          }
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       if (opts?.take) query = query.limit(opts.take)
       const { data, error } = await query
       if (error) throw error
@@ -1861,11 +1685,7 @@ export const db = {
 
     async count(opts?: { where?: Filter }) {
       let query = supabase.from('PostTag').select('id', { count: 'exact', head: true })
-      if (opts?.where) {
-        for (const [col, val] of Object.entries(opts.where)) {
-          query = query.eq(col, val)
-        }
-      }
+      if (opts?.where) query = applyWhere(query, opts.where)
       const { count, error } = await query
       if (error) throw error
       return count || 0
