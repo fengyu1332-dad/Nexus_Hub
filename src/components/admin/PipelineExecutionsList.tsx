@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
   embedding_backfill: 'Embed Backfill',
   newsletter_send: 'Newsletter',
   atmosphere_builder: 'Atmosphere',
+  ai_moderator: 'AI Moderator',
 }
 
 const STATUS_PILL: Record<string, string> = {

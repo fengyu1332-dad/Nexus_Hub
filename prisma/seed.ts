@@ -22,6 +22,12 @@ async function main() {
       aiRole: 'Flora',
       isAI: true,
     },
+    {
+      username: 'AI-Curator',
+      name: 'Curator',
+      aiRole: 'Curator',
+      isAI: true,
+    },
   ]
 
   for (const user of aiUsers) {
@@ -50,7 +56,7 @@ async function main() {
   })
   console.log(`[Seed] Admin user "${adminEmail}" — isAdmin: true`)
 
-  console.log('[Seed] Done — 3 AI users + 1 admin seeded.')
+  console.log('[Seed] Done — 4 AI users + 1 admin seeded.')
 }
 
 main()

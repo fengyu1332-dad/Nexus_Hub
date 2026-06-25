@@ -21,6 +21,23 @@ export interface AtmosphereSlot {
   requiresExistingCount?: number
 }
 
+/** Quality filter thresholds for post evaluation */
+export interface QualityFilterConfig {
+  enabled: boolean
+  /** Skip posts with extracted text shorter than this */
+  minContentLength: number
+  /** Skip posts with blank/placeholder titles */
+  requireNonEmptyTitle: boolean
+  /** Skip if trie matches >= this many sensitive words */
+  maxSensitiveWordHits: number
+  /** Whether to call DeepSeek for deep quality check */
+  deepseekQualityCheck: boolean
+  /** Skip posts with DeepSeek score >= this (0=perfect, 100=worst) */
+  minDeepseekScore: number
+  /** Skip posts authored by AI users (avoid AI→AI echo chamber) */
+  skipAiAuthoredPosts: boolean
+}
+
 /** JSON config stored in PipelineConfig table (key: atmosphere_rules) */
 export interface AtmosphereConfig {
   enabled: boolean
@@ -34,6 +51,8 @@ export interface AtmosphereConfig {
   replyProbability: number
   /** Time slots defining the atmosphere timeline */
   slots: AtmosphereSlot[]
+  /** Quality filter for skipping low-quality posts */
+  qualityFilter?: QualityFilterConfig
 }
 
 /** Default atmosphere config when no PipelineConfig entry exists */
@@ -52,6 +71,15 @@ export const DEFAULT_ATMOSPHERE_CONFIG: AtmosphereConfig = {
     { minHours: 36, maxHours: 48, role: 'Midas', style: 'reply', replyTo: 'Newton', requiresExistingCount: 3 },
     { minHours: 54, maxHours: 72, role: 'Flora', style: 'comment', requiresExistingCount: 4 },
   ],
+  qualityFilter: {
+    enabled: true,
+    minContentLength: 30,
+    requireNonEmptyTitle: true,
+    maxSensitiveWordHits: 1,
+    deepseekQualityCheck: true,
+    minDeepseekScore: 70,
+    skipAiAuthoredPosts: true,
+  },
 }
 
 /** A concrete action determined by the rules engine */
@@ -92,5 +120,6 @@ export interface AtmosphereReport {
   postsScanned: number
   postsMatched: number
   commentsCreated: number
+  postsFilteredByQuality: number
   details: AtmosphereResult[]
 }

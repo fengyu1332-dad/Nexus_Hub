@@ -6,6 +6,7 @@ import {
   markPipelineSuccess,
   markPipelineFailed,
 } from '@/lib/pipeline-logger'
+import { checkContentQuality, getSensitiveWordFilter } from '@/lib/moderation'
 import type {
   AtmosphereConfig,
   AtmosphereAction,
@@ -43,17 +44,17 @@ async function getAiUserMap(): Promise<{
  * Query eligible posts: published within lookbackDays.
  */
 async function getEligiblePosts(config: AtmosphereConfig): Promise<
-  Array<{ id: string; title: string; content: string; createdAt: string }>
+  Array<{ id: string; title: string; content: string; createdAt: string; authorId: string; voteCount: number }>
 > {
   const lookbackDate = new Date()
   lookbackDate.setDate(lookbackDate.getDate() - config.lookbackDays)
 
   const posts = (await db.post.findMany({
-    where: { createdAt: { gte: lookbackDate.toISOString() } },
-    select: { id: true, title: true, content: true, createdAt: true },
+    where: { createdAt: { gte: lookbackDate.toISOString() }, status: 'PUBLISHED' },
+    select: { id: true, title: true, content: true, createdAt: true, authorId: true, voteCount: true },
     orderBy: { createdAt: 'desc' },
     take: 30,
-  })) as { id: string; title: string; content: string; createdAt: string }[]
+  })) as { id: string; title: string; content: string; createdAt: string; authorId: string; voteCount: number }[]
 
   return posts
 }
@@ -89,6 +90,77 @@ async function getAiCommentsForPost(
 }
 
 /**
+ * Extract plain text from EditorJS JSON content for quality evaluation.
+ */
+function extractContentText(content: unknown): string {
+  try {
+    const parsed = typeof content === 'string' ? JSON.parse(content) : content
+    if (parsed && typeof parsed === 'object') {
+      const blocks = (parsed as any).blocks as any[] | undefined
+      if (blocks) {
+        return blocks
+          .map((b: any) => b.data?.text || '')
+          .join('\n')
+          .trim()
+      }
+      if (typeof (parsed as any).text === 'string') return (parsed as any).text.trim()
+    }
+    return String(content).slice(0, 3000)
+  } catch {
+    return String(content).slice(0, 3000)
+  }
+}
+
+/**
+ * Multi-phase quality check for a post.
+ * Returns { passed, reason, score }.
+ */
+async function evaluatePostQuality(
+  post: { id: string; title: string; content: string; authorId: string; voteCount: number },
+  config: AtmosphereConfig,
+  aiUserIdSet: Set<string>
+): Promise<{ passed: boolean; reason: string; score: number }> {
+  const qf = config.qualityFilter
+  if (!qf?.enabled) return { passed: true, reason: 'filter disabled', score: 0 }
+
+  // Phase 1: Skip AI-authored posts
+  if (qf.skipAiAuthoredPosts && aiUserIdSet.has(post.authorId)) {
+    return { passed: false, reason: 'AI-authored post', score: 0 }
+  }
+
+  // Phase 2: Empty or placeholder title
+  if (qf.requireNonEmptyTitle) {
+    const t = post.title.trim()
+    if (!t || t === '无标题' || t.length < 2) {
+      return { passed: false, reason: 'empty/placeholder title', score: 100 }
+    }
+  }
+
+  // Phase 3: Content too short
+  const contentText = extractContentText(post.content)
+  if (contentText.length < qf.minContentLength) {
+    return { passed: false, reason: `content too short (${contentText.length} chars)`, score: 100 }
+  }
+
+  // Phase 4: Trie-based sensitive word check (fast, no API call)
+  const trie = getSensitiveWordFilter()
+  const hits = trie.search(contentText)
+  if (hits.length >= qf.maxSensitiveWordHits) {
+    return { passed: false, reason: `sensitive words: ${hits.join(', ')}`, score: 100 }
+  }
+
+  // Phase 5: DeepSeek deep quality check
+  if (qf.deepseekQualityCheck && process.env.DEEPSEEK_API_KEY) {
+    const result = await checkContentQuality(contentText, `标题: ${post.title}`)
+    if (!result.passed || result.score >= qf.minDeepseekScore) {
+      return { passed: false, reason: `DeepSeek score=${result.score}`, score: result.score }
+    }
+  }
+
+  return { passed: true, reason: 'ok', score: 0 }
+}
+
+/**
  * Main atmosphere builder — scans posts and orchestrates AI comments.
  */
 export async function buildAtmosphere(
@@ -105,6 +177,7 @@ export async function buildAtmosphere(
     postsScanned: 0,
     postsMatched: 0,
     commentsCreated: 0,
+    postsFilteredByQuality: 0,
     details: [],
   }
 
@@ -121,9 +194,23 @@ export async function buildAtmosphere(
 
     const posts = await getEligiblePosts(config)
     report.postsScanned = posts.length
+    const aiUserIdSet = new Set(aiUserIds)
 
     for (const post of posts) {
       if (report.commentsCreated >= maxPerRun) break
+
+      // Quality gate: skip low-quality / spam posts
+      const qualityResult = await evaluatePostQuality(post, config, aiUserIdSet)
+      if (!qualityResult.passed) {
+        report.postsFilteredByQuality++
+        report.details.push({
+          postId: post.id,
+          role: '',
+          action: 'skipped',
+          reason: `Quality filter: ${qualityResult.reason}`,
+        })
+        continue
+      }
 
       const existingAiComments = await getAiCommentsForPost(post.id, aiUserIds, idToRole)
 
@@ -190,7 +277,7 @@ export async function buildAtmosphere(
 
     await markPipelineSuccess(
       executionId,
-      `${report.commentsCreated} comments on ${report.postsMatched} posts`
+      `${report.commentsCreated} comments on ${report.postsMatched} posts (${report.postsFilteredByQuality} filtered out)`
     )
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
