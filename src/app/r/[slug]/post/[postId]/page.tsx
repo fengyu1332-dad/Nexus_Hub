@@ -208,7 +208,7 @@ const SubRedditPostPage = async ({ params }: SubRedditPostPageProps) => {
               </Link>
               {(post?.author as any)?.isAI && <AIBadge aiRole={(post?.author as any)?.aiRole} />}
               {' '}
-              {formatTimeToNow(new Date(post?.createdAt ?? cachedPost?.createdAt ?? Date.now()), locale)}
+              {formatTimeToNow(post?.createdAt ?? cachedPost?.createdAt ?? Date.now(), locale)}
             </p>
             <BookmarkButton postId={params.postId} initialSaved={isSaved} />
             <ReportButton targetType="post" targetId={params.postId} />

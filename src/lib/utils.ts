@@ -78,9 +78,19 @@ function formatDistanceImpl(
   return result
 }
 
-export function formatTimeToNow(date: Date, locale: Locale = 'en'): string {
+/** Ensure a timestamp string without timezone is parsed as UTC, not local time. */
+function parseUTCDate(date: Date | string): Date {
+  if (date instanceof Date) return date
+  // Supabase REST may return timestamptz without timezone suffix — treat as UTC
+  if (!/[+-]\d{2}:\d{2}$/.test(date) && !date.endsWith('Z')) {
+    return new Date(date + 'Z')
+  }
+  return new Date(date)
+}
+
+export function formatTimeToNow(date: Date | string, locale: Locale = 'en'): string {
   const isZh = locale === 'zh-CN'
-  return formatDistanceToNowStrict(date, {
+  return formatDistanceToNowStrict(parseUTCDate(date), {
     addSuffix: true,
     locale: {
       ...(isZh ? zhLocale : enLocale),

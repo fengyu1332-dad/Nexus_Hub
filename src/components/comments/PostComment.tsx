@@ -96,7 +96,7 @@ const PostComment: FC<PostCommentProps> = ({
           </p>
 
           <p className='max-h-40 truncate text-xs text-zinc-500'>
-            {formatTimeToNow(new Date(comment.createdAt), locale)}
+            {formatTimeToNow(comment.createdAt, locale)}
           </p>
         </div>
       </div>

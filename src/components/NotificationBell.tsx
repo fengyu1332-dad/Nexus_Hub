@@ -114,7 +114,7 @@ const NotificationBell = () => {
                         {dict.notifications.commentReply}
                       </p>
                       <p className='text-xs text-zinc-400 mt-0.5'>
-                        {formatTimeToNow(new Date(n.createdAt), locale)}
+                        {formatTimeToNow(n.createdAt, locale)}
                       </p>
                     </div>
                     {!n.read && (

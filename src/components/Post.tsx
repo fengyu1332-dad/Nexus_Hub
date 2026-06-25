@@ -82,7 +82,7 @@ const Post: FC<PostProps> = ({
               title={`${_votesAmt} votes`}>
               {_votesAmt >= 3 ? '↑' : _votesAmt < 0 ? '↓' : '·'}{_votesAmt}
             </span>
-            {formatTimeToNow(new Date(post.createdAt), locale)}
+            {formatTimeToNow(post.createdAt, locale)}
           </div>
           <a href={`/r/${subredditName}/post/${post.id}`}>
             <h1 className='text-lg font-semibold py-2 leading-6 text-gray-900 flex items-center gap-1.5'>
